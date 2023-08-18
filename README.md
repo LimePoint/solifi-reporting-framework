@@ -1,5 +1,45 @@
 # Solifi Realtime Reporting Kafka Consumer
 
+
+<!-- TOC -->
+* [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
+  * [Change Log](#change-log)
+    * [Release 1.0.3](#release-103)
+  * [Supported Deployment Methods](#supported-deployment-methods)
+  * [Supported Backend Databases](#supported-backend-databases)
+  * [Access To LimePoint Support](#access-to-limepoint-support)
+  * [Java Version Support](#java-version-support)
+  * [Anatomy Of The Consumer](#anatomy-of-the-consumer)
+    * [The Consumer Application](#the-consumer-application)
+    * [Understanding Application.yaml File](#understanding-applicationyaml-file)
+  * [Deployment Methods](#deployment-methods)
+    * [Deploying Standalone](#deploying-standalone)
+    * [Deploying As Docker Container](#deploying-as-docker-container)
+    * [Deploying on Azure Kubernetes (AKS)](#deploying-on-azure-kubernetes-aks)
+      * [Create ConfigMaps](#create-configmaps)
+      * [Create Deployment](#create-deployment)
+      * [Validate Container Logs](#validate-container-logs)
+      * [References](#references)
+    * [Deploying on ECS](#deploying-on-ecs)
+    * [Deploying on K8s](#deploying-on-k8s)
+  * [Advanced Deployment Methods](#advanced-deployment-methods)
+    * [Running Multiple Consumers](#running-multiple-consumers)
+    * [Running Consumers in Different environments](#running-consumers-in-different-environments)
+  * [Handling Date & Time](#handling-date--time)
+<!-- TOC -->
+
+## Change Log
+
+### Release 1.0.3
+
+This release introduces breaking changes for customers that are on version **1.0.2** or lower. Please contact LimePoint support if you are upgrading to **1.0.3**. For fresh installations please be aware of the new configurations this release introduces.
+
+1. Enhanced license validation introduced and exposed via config **solifi.license.path** and **solifi.license.signature.path**. Please get in touch with LimePoint support to grab the new licenses. Property **solifi.license.enc** has been deprecated and removed.
+2. Added config **solifi.data.timezone** to allow custom timezones when persisting data in the target databases. Default would be system timezone where the consumer application runs. Values should be as a [TZ Identifier](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). eg: Australia/Adelaide. Updating this config will **change** existing records. To update the tables with a timezone value, simply change the config in application.yml and restart the consumer application with a new groupID or reset the offset of the existing topics for the existing groupID.
+3. Enhanced how the consumer app handles table metadata and change management. This change will now allow customers running multiple copies of the consumer application across platforms and point to the same database. e.g One instance can run on docker and another instance can run as a standalone and both instances can write to the same database.
+
+---
+
 Solifi Realtime Reporting application is a Kafka Consumer that allows customers to read messages from Solifi brokers and persist it in the database of choice. The consumer is generic and can be used by any customer using Solifi services and allows modifications via configuration files.
 
 The consumer provides the following functionalities:
@@ -17,7 +57,7 @@ The consumer can be deployed as a standalone Java application or as a container.
 ## Supported Backend Databases
 The consumer can persist messages to the following databases:
 
-1. Postgre SQL
+1. Postgres SQL
 2. Microsoft SQL
 3. MySQL
 4. MariaDB
@@ -37,7 +77,7 @@ The consumer is supported with the following Java versions:
 The consumer artefact consists for three important files which are all required for it to function properly, viz.
 
 1. The Java archive (solifi-consumer-<version>.jar)
-2. A license file
+2. A license files (license.license and signature file)
 3. A sample application.yaml file
 
 ### The Consumer Application
@@ -46,13 +86,13 @@ The consumer application has inbuilt functionality to manage the backend databas
 When Solifi publishes new schemas or makes changes to existing schemas, LimePoint will publish a new Consumer Jar/docker image. Once the new app is started, it will detect what changes are required to the backend database and make appropriate changes. The changes are idempotent in nature, i.e. the consumer won't make any changes to the database schemas if they already are up-to date.
 
 ### Understanding Application.yaml File
-The behavior of the consumer is controlled via a application.yaml file. This file directs the consumer on which brokers to read data from, what backend database to persist data to, how many threads to run etc. You can strip out configurations that you don't need in your application.yaml. The sample below shows all possible configurations that are currently supported. 
+The behavior of the consumer is controlled via an application.yaml file. This file directs the consumer on which brokers to read data from, what backend database to persist data to, how many threads to run etc. You can strip out configurations that you don't need in your application.yaml. The sample below shows all possible configurations that are currently supported. 
 
 ```yaml
 spring:
   kafka:
     consumer:
-      group-id: # e.g. myabc-consumer-1; Enter  your consumer group ID here. You can get this information from your Solifi representative. 
+      group-id: # e.g. myabc-consumer-1; Enter  your consumer group ID here. You can get this information from your Solifi representative. We encourage to use a new group ID to support correct E2E testing. Using an existing group ID could cause no data, because data offsets could be already read and committed from another application.
     bootstrap-servers: # e.g. pkc-89hc.ap-southeast-2.aws.confluent.cloud:9092; This is the address of your Solifi brokers. You can get this information from your Solifi representative. 
     properties:
       schema:
@@ -65,6 +105,7 @@ spring:
       retry.backoff.ms: 500
       basic.auth.credentials.source: USER_INFO
       sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="API-KEY" password="API-SECRET"; # e.g You must enter your username and password for Kakfa here. You can get this information from your Solifi representative.
+      #partition.assignment.strategy: # This is optional. Will default to RangeAssignor if not provided. eg: org.apache.kafka.clients.consumer.RoundRobinAssignor, org.apache.kafka.clients.consumer.StickyAssignor, org.apache.kafka.clients.consumer.RangeAssignor
   # Datasources control where the messages are stored in the backend.
   datasource:
     ## Microsoft SQL
@@ -120,8 +161,10 @@ solifi:
   concurrency: 5
   prefix: # Client prefix for Solifi brokers. e.g. uat.myabc.ILS.canonical
   license:
-    enc:
-      path: # Path of the license file provided by LimePoint.
+    path: # Path of the license file provided by LimePoint.
+    signature:
+      path: # Path of the signature file provided by LimePoint.
+  data.timezone: # TZ identifier in TZDB. Refer: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not present, reads the default system timezone and saves timestamp values in system timezone.
 
 ```
 
@@ -138,7 +181,7 @@ To deploy as a standalone application:
 * Place the license.enc file in a desired folder and update the path in the application.yaml.
 * Make sure you are in the same folder as the jar file and application.yml file and run the jar file using the below command. This will start the application and create the database tables and start consuming from the kafka topics specified under _solifi.topics_ config.
 
-````
+````bash
 java -jar solifi-consumer-<version>.jar
 ````
 
@@ -202,6 +245,7 @@ spec:
       containers: # A pod wraps one or more containers. Here we define all containers
         - name: solificonsumer-container 
           image: limepoint/solifi-reporting:<version>
+          #imagePullPolicy: Always #This is optional. Default would be 'IfNotPresent'. Change to 'Always' if need to pull the image whenever pod restarts.
           env: 
           - name: spring.config.additional-location
             value: "/config/application.yaml"
@@ -218,8 +262,10 @@ spec:
             items:
             - key: "application.yaml"
               path: "application.yaml" 
-            - key: "license.enc"
-              path: "license.enc"      
+            - key: "license.license"
+              path: "license.license"
+            - key: "sign256.sign"
+              path: "sign256.sign"   
 ````
 
 Apply the deployment.yaml. This will create a new deployment under 'Azure Workloads' and start-up the 'solificonsumer' container pods.
@@ -329,3 +375,9 @@ Run,
 ### Running Consumers in Different environments
 You need to update the application.yml file according to the environment. 
 Additionally, if it is a kubernetes deployment and configMaps are used, then configMaps of that namespace should also be updated.
+
+## Handling Date & Time
+1. You would notice a warning log, **_[WARNING] Ignoring invalid logical type for name: date_** during solifi-consumer execution. The reason is due to a mismatch of a data type sent from Solifi.  Usually "logicalType" represented in avro schema for _date_ fields are expected to be of "type" _int_, but Solifi sends date fields as _long_ values. Therefore, the fields are generated as Long fields, which is warned through this warning log. For more details check on the [avro spec](https://avro.apache.org/docs/1.10.2/spec.html#:~:text=with%20RFC%2D4122-,Date,-The%20date%20logical). 
+2. The timestamp-millis logical type represents an instant on the global timeline, independent of a particular time zone or calendar, with a precision of one millisecond. Please note that time zone information gets lost in this process. Upon reading a value back, we can only reconstruct the instant, but not the original representation. In practice, such timestamps are typically displayed to users in their local time zones, therefore they may be displayed differently depending on the execution environment. For more information read on the [timestamp-millis in avro spec](https://avro.apache.org/docs/1.10.2/spec.html#:~:text=00%3A00%3A00.000000.-,Timestamp,-(millisecond%20precision)). To avoid such misrepresentations we have introduced the **solifi.data.timezone** configuration where the desired timezone to be saved in the database could be decided. This config value needs to be in TZ identifier format (If not provided will default to system timezone, which is usually UTC in docker environments).
+3. Date fields will follow the same conditions as timestamp values (mentioned in above point 2) where the timezone will be controlled by **solifi.data.timezone** configuration. If not specified, system default timezone will be used (If not provided will default to system timezone, which is usually UTC in docker environments).
+
