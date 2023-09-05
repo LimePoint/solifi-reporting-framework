@@ -201,9 +201,10 @@ services:
     image: limepoint/solifi-reporting:<version>
     volumes:
       - /<path_of_application.yaml_on_your_system>:/application.yaml
-      - /<path_of_license_file_on_your_system>:/license.enc
+      - /<path_of_license_file_on_your_system>:/license.license
+      - /<path_of_signature_file_on_your_system>:/sign256.sign
     environment:
-      - spring.config.additional-location=/application.yml # path of the external application.yaml file
+      - spring.config.additional-location=/application.yml # path of the application.yaml file
 ````
 
 Start-up the docker container using, 
@@ -220,9 +221,12 @@ Since the consumer requires `application.yaml` and `license` files to function c
 #### Create ConfigMaps
 Use the following commands to create configMaps to store the contents of the license file and the application.yaml file.
 ````
-kubectl create configmap consumer-config --from-file=application.yaml --from-file=license.enc
+kubectl create configmap consumer-config --from-file=application.yaml --from-file=license.license --from-file=sign256.sign 
 kubectl describe configmaps consumer-config
 kubectl edit configmap -n <namespace> <configMapName> -o yaml
+
+# apply update to ConfigMap using dry-run and replace
+kubectl create configmap consumer-config  --from-file=license.license --from-file=sign256.sign --from-file=application.yml -o yaml --dry-run=client | kubectl replace -f -
 ````
 
 #### Create Deployment
