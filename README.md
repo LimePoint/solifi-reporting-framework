@@ -4,6 +4,8 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
+    * [Release 1.0.4](#release-104)
+        * [Schema Changes](#schema-changes)
     * [Release 1.0.3](#release-103)
   * [Supported Deployment Methods](#supported-deployment-methods)
   * [Supported Backend Databases](#supported-backend-databases)
@@ -16,19 +18,38 @@
     * [Deploying Standalone](#deploying-standalone)
     * [Deploying As Docker Container](#deploying-as-docker-container)
     * [Deploying on Azure Kubernetes (AKS)](#deploying-on-azure-kubernetes-aks)
-      * [Create ConfigMaps](#create-configmaps)
-      * [Create Deployment](#create-deployment)
-      * [Validate Container Logs](#validate-container-logs)
-      * [References](#references)
+        * [Create ConfigMaps](#create-configmaps)
+        * [Create Deployment](#create-deployment)
+        * [Validate Container Logs](#validate-container-logs)
+        * [References](#references)
     * [Deploying on ECS](#deploying-on-ecs)
     * [Deploying on K8s](#deploying-on-k8s)
   * [Advanced Deployment Methods](#advanced-deployment-methods)
     * [Running Multiple Consumers](#running-multiple-consumers)
     * [Running Consumers in Different environments](#running-consumers-in-different-environments)
   * [Handling Date & Time](#handling-date--time)
+  * [Scaling Consumer Application](#scaling-consumer-application)
 <!-- TOC -->
 
 ## Change Log
+
+### Release 1.0.4
+
+This release has some minor bug fixes.
+
+1. Fixed a date conversion issue for mandatory date fields.
+2. Internal enhancements and code cleanups (Removed internal code structure for producer and set default values for optional fields).
+3. Disabled automatic topic creations by consumer.
+4. Enhanced logging capability for more clarity on the logs.
+
+##### Schema Changes
+
+|   | Topic Name      | Fields Added | Fields Deleted | Other Updates                                                                                | Status         |
+|---|-----------------|--------------|----------------|----------------------------------------------------------------------------------------------|----------------|
+| 1 | as_open_item_nf |              |                |                                                                                              | New Topic      |
+| 2 | as_user3_nf     |              |                |                                                                                              | New Topic      |
+| 3 | ds_connector_2  |              |                | - **last_update_ts**: logical type has changed from _timestamp-millis_ to _timestamp-micros_ | Existing Topic |
+|   |                 |              |                |                                                                                              |                |
 
 ### Release 1.0.3
 
@@ -158,7 +179,7 @@ solifi:
   #- addl_lessor_nf
   #- addl_parame_euro_dd_lessors
   #- address_nf
-  concurrency: 5
+  concurrency: 5 # for better performance this should be equal to the topic partition count
   prefix: # Client prefix for Solifi brokers. e.g. uat.myabc.ILS.canonical
   license:
     path: # Path of the license file provided by LimePoint.
@@ -385,3 +406,11 @@ Additionally, if it is a kubernetes deployment and configMaps are used, then con
 2. The timestamp-millis logical type represents an instant on the global timeline, independent of a particular time zone or calendar, with a precision of one millisecond. Please note that time zone information gets lost in this process. Upon reading a value back, we can only reconstruct the instant, but not the original representation. In practice, such timestamps are typically displayed to users in their local time zones, therefore they may be displayed differently depending on the execution environment. For more information read on the [timestamp-millis in avro spec](https://avro.apache.org/docs/1.10.2/spec.html#:~:text=00%3A00%3A00.000000.-,Timestamp,-(millisecond%20precision)). To avoid such misrepresentations we have introduced the **solifi.data.timezone** configuration where the desired timezone to be saved in the database could be decided. This config value needs to be in TZ identifier format (If not provided will default to system timezone, which is usually UTC in docker environments).
 3. Date fields will follow the same conditions as timestamp values (mentioned in above point 2) where the timezone will be controlled by **solifi.data.timezone** configuration. If not specified, system default timezone will be used (If not provided will default to system timezone, which is usually UTC in docker environments).
 
+## Scaling Consumer Application
+Scaling is highly dependent on the number of partitions in a kafka topic. As per kafka concepts, consumers could be defined within a consumer group to listen to a topic in parallel. 
+eg: if a topic has 5 partitions, then starting 5 consumers under the same consumer group ID will enable parallel processing by the different consumers.
+
+Rather than starting separate consumers individually, Solifi-consumer application is capable of supporting such scenario simply by setting the number of concurrent threads/listeners count of the application by increasing the solifi.concurrency configuration in application.yml. 
+eg: solifi.concurrency = 5, is equal to having 5 consumers listening to the topics. 
+
+Additionally, if there is are topics with higher TPS, then clients could start up a separate consumer with that particular topic(s) only and set the thread count(solifi.concurrency config) to the number of partitions of the topic. 
