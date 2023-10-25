@@ -4,8 +4,10 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
-    * [Release 1.0.4](#release-104)
+    * [Release 1.0.5](#release-105)
         * [Schema Changes](#schema-changes)
+    * [Release 1.0.4](#release-104)
+        * [Schema Changes](#schema-changes-1)
     * [Release 1.0.3](#release-103)
   * [Supported Deployment Methods](#supported-deployment-methods)
   * [Supported Backend Databases](#supported-backend-databases)
@@ -29,9 +31,29 @@
     * [Running Consumers in Different environments](#running-consumers-in-different-environments)
   * [Handling Date & Time](#handling-date--time)
   * [Scaling Consumer Application](#scaling-consumer-application)
+  * [Error Handling](#error-handling)
 <!-- TOC -->
 
 ## Change Log
+
+### Release 1.0.5
+
+**Changes**  
+1. Introduced error_log table to log any data related errors when consuming from upstream brokers. This table will store any events that the Consumer could not process. Refer the section [Error Handling](#error-handling) later in this document.
+2. The consumer will now add default values for fields as outlined in the **Schema Changes** table below. 
+
+**Bug fixes**  
+1. Switched `TIMESTAMP` to `DATETIME` to accept negative timestamp values for MySQL and MariaDb database to overcome the date limitation.
+2. Downsized the size of `VARCHAR` columns from `VARCHAR(4000)` to `VARCHAR(100)` to avoid exceeding row size limitations for MariaDB and MySQL.
+3. Fields with logical type `timestamp-micros` will be considered as a timestamp equivalent column, similar to logical type `timestamp-millis`.
+
+##### Schema Changes
+
+|   | Topic Name     | Fields Added | Fields Deleted | Other Updates                                                               | Status         |
+|---|----------------|--------------|----------------|-----------------------------------------------------------------------------|----------------|
+| 1 | addl_lessor_nf |              |                | - **al_tax_engine**: Field default value is changed from **null** to **I**. | Existing Topic |
+|   |                |              |                |                                                                             |                |
+
 
 ### Release 1.0.4
 
@@ -414,3 +436,7 @@ Rather than starting separate consumers individually, Solifi-consumer applicatio
 eg: solifi.concurrency = 5, is equal to having 5 consumers listening to the topics. 
 
 Additionally, if there is are topics with higher TPS, then clients could start up a separate consumer with that particular topic(s) only and set the thread count(solifi.concurrency config) to the number of partitions of the topic. 
+
+## Error Handling
+The consumer application captures any data related errors (e.g. invalid data) and loads them in the **error_log** table. This table gets created and managed by the Consumer during startup. Customers should keep track of the this table to lookup failed messages. The messages in this table are not cleaned up by the Consumer and it is expected that the clients cleanup as they see fit.
+
