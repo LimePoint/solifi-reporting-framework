@@ -4,10 +4,12 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
-    * [Release 1.0.5](#release-105)
+    * [Release 1.0.6](#release-106)
         * [Schema Changes](#schema-changes)
-    * [Release 1.0.4](#release-104)
+    * [Release 1.0.5](#release-105)
         * [Schema Changes](#schema-changes-1)
+    * [Release 1.0.4](#release-104)
+        * [Schema Changes](#schema-changes-2)
     * [Release 1.0.3](#release-103)
   * [Supported Deployment Methods](#supported-deployment-methods)
   * [Supported Backend Databases](#supported-backend-databases)
@@ -32,9 +34,32 @@
   * [Handling Date & Time](#handling-date--time)
   * [Scaling Consumer Application](#scaling-consumer-application)
   * [Error Handling](#error-handling)
+  * [Auditing](#auditing)
+    * [How Auditing Works](#how-auditing-works)
+    * [Points to note](#points-to-note-)
 <!-- TOC -->
 
 ## Change Log
+
+Note: **Not all schemas are available for all clients, please get in touch with LimePoint support for any clarifications.**
+
+### Release 1.0.6
+
+**Changes**
+1. Introduced auditing functionality. If Audits are enabled, audit tables are created and data is inserted for auditing. Refer the section [Auditing](#auditing) later in this document.
+
+##### Schema Changes
+
+|   | Topic Name                  | Fields Added | Fields Deleted | Other Updates | Status    |
+|---|-----------------------------|--------------|----------------|---------------|-----------|
+| 1 | as_add_ausr_additional_data |              |                |               | New Topic |
+| 2 | as_fed_depr_nf              |              |                |               | New Topic |
+| 3 | as_oper_depr_nf             |              |                |               | New Topic |
+| 4 | data_streaming              |              |                |               | New Topic |
+| 5 | ls_add_ausr_additional_data |              |                |               | New Topic |
+| 6 | ls_pymt_schedule_nf         |              |                |               | New Topic |
+| 7 | re_master_nf                |              |                |               | New Topic |
+|   |                             |              |                |               |           |
 
 ### Release 1.0.5
 
@@ -197,7 +222,7 @@ logging:
     com.limepoint.solifi: INFO
 
 solifi:
-  topics: # List of topics the client wishes to consume from Solifi brokers. Note that the topic names must not have any prefix.
+  topics: # List of topics client wishes to consume from Solifi brokers. Note that the topic names must not have any prefix.
   #- addl_lessor_nf
   #- addl_parame_euro_dd_lessors
   #- address_nf
@@ -208,7 +233,11 @@ solifi:
     signature:
       path: # Path of the signature file provided by LimePoint.
   data.timezone: # TZ identifier in TZDB. Refer: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not present, reads the default system timezone and saves timestamp values in system timezone.
-
+  audit-tables: # Topics which needs to be audited. Depending on this, audit tables will be created and data will be inserted to audit tables. Empty config will not create any audit tables.
+  #- all
+  #- addl_lessor_nf
+  #- addl_parame_euro_dd_lessors
+  #- address_nf
 ```
 
 ## Deployment Methods
@@ -440,3 +469,78 @@ Additionally, if there is are topics with higher TPS, then clients could start u
 ## Error Handling
 The consumer application captures any data related errors (e.g. invalid data) and loads them in the **error_log** table. This table gets created and managed by the Consumer during startup. Customers should keep track of the this table to lookup failed messages. The messages in this table are not cleaned up by the Consumer and it is expected that the clients cleanup as they see fit.
 
+## Auditing
+Auditing can be enabled by specifying the topic names as a list in 'solifi.audit-tables' config in application.yml. If this is enabled, an additional audit table as <topicname>_audit will be created in the database. Any data changes in the main tables will be recorded in audit tables. Specify 'all' in the config if all tables need to be audited or leave empty if auditing should be disabled.
+Eg 1: Creates _audit tables for _all_ topics and inserts data whenever there is any change in the records of main table.
+````yaml
+solifi.audit-tables:
+  - all
+````
+
+Eg 2: Creates _audit tables only for addl_lessor_nf topic and inserts data only when addl_lessor_nf has any change in the records.
+````yaml
+solifi.audit-tables:
+  - addl_lessor_nf
+````
+
+### How Auditing Works
+**Scenario 1:** Any data 'insert' into main tables
+A similar record will be inserted into the audit table with all the metadata information, inserted user, entered time, revision and action (action=INSERT)
+
+Eg: Insert record
+
+_Main Table: ls_master_
+
+| id | contract_number | invoice_date            |
+|----|-----------------|-------------------------|
+| 1  | ABC             | 2023-10-23 03:35:02.275 |
+
+_Audit Table: ls_master_audit_
+
+| id | revision | contract_number | invoice_date            | performed_action | inserted_user   | inserted_date           |
+|----|----------|-----------------|-------------------------|------------------|-----------------|-------------------------|
+| 1  | 1        | ABC             | 2023-10-23 03:35:02.275 | INSERT           | solifi-consumer | 2023-11-13 03:35:02.275 |
+
+**Scenario 2:** Any data 'update' into main table records
+Received updated record will be inserted into the audit table as a new record with all the metadata information, user, entered time, revision and action (action=UPDATE)
+
+Eg: Update record
+
+_Main Table: ls_master_
+
+| id | contract_number | invoice_date            |
+|----|-----------------|-------------------------|
+| 1  | ABCDEF          | 2023-10-23 03:35:02.275 |
+
+_Audit Table: ls_master_audit_
+
+| id | revision | contract_number | invoice_date            | performed_action | inserted_user   | inserted_date           |
+|----|----------|-----------------|-------------------------|------------------|-----------------|-------------------------|
+| 1  | 1        | ABC             | 2023-10-23 03:35:02.275 | INSERT           | solifi-consumer | 2023-11-13 03:35:02.275 |
+| 1  | 2        | ABCDEF          | 2023-10-23 03:35:02.275 | UPDATE           | solifi-consumer | 2023-11-14 06:33:23.234 |
+
+**Scenario 3: Any data 'delete'**
+A record with null values will be inserted in to the audit table with all the metadata information, user, entered time, revision and action (action=DELETE)
+
+Eg: Delete record
+
+_Main Table: ls_master_
+
+| id | contract_number | invoice_date |
+|----|-----------------|--------------|
+|    | <No Records>    |              |
+
+
+_Audit Table: ls_master_audit_
+
+| id | revision | contract_number | invoice_date            | performed_action | inserted_user   | inserted_date           |
+|----|----------|-----------------|-------------------------|------------------|-----------------|-------------------------|
+| 1  | 1        | ABC             | 2023-10-23 03:35:02.275 | INSERT           | solifi-consumer | 2023-11-13 03:35:02.275 |
+| 1  | 2        | ABCDEF          | 2023-10-23 03:35:02.275 | UPDATE           | solifi-consumer | 2023-11-14 06:33:23.234 |
+| 1  | 3        | null            | null                    | DELETE           | null            | null                    |
+
+### Points to note 
+
+* Data in audit tables aren't cleaned up. It needs to be handled manually according to data retention policies.
+* Since auditing stores a copy of the data, additional storage is required. So you must plan the storage accordingly. Usually, if you enable auditing globally (via the ALL flag), you need approximately more than twice the storage.
+* Any configuration changes do not come into effect without a restart of the consumer.
