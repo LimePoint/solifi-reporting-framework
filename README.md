@@ -4,12 +4,14 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
-    * [Release 1.0.6](#release-106)
+    * [Release 1.0.7](#release-107)
         * [Schema Changes](#schema-changes)
-    * [Release 1.0.5](#release-105)
+    * [Release 1.0.6](#release-106)
         * [Schema Changes](#schema-changes-1)
-    * [Release 1.0.4](#release-104)
+    * [Release 1.0.5](#release-105)
         * [Schema Changes](#schema-changes-2)
+    * [Release 1.0.4](#release-104)
+        * [Schema Changes](#schema-changes-3)
     * [Release 1.0.3](#release-103)
   * [Supported Deployment Methods](#supported-deployment-methods)
   * [Supported Backend Databases](#supported-backend-databases)
@@ -42,6 +44,18 @@
 ## Change Log
 
 Note: **Not all schemas are available for all clients, please get in touch with LimePoint support for any clarifications.**
+
+### Release 1.0.7
+
+**Changes**
+1. License start date is validated. Application will not be started before the start date in the license.
+2. Executing ddl scripts can be disabled using spring.liquibase.enabled configuration if client desire to maintain the database on their own. 
+
+**Bug fixes**
+1. Fixed a class loading issue thrown when running the application through the jar.
+
+##### Schema Changes
+No new schema changes
 
 ### Release 1.0.6
 
@@ -210,6 +224,7 @@ spring:
   # liquibase.database.type # database type client uses.
   # liquibase.client.prefix # client prefix used in the schema registry. Same as the value of _solifi.prefix_ in application.yaml
   liquibase:
+    #enabled: true # by default this is true. This should be set to 'false' if ddl scripts shouldn't be executed through solifi-consumer application. In such case, client needs to take responsibility in running their own scripts to generate the tables and make sure the tables are ready with correct columns before starting the application. Any future changes usually received and handled through updating solifi-consumer, will also need to be handled by the client.
     parameters:
       liquibase:
         client:
