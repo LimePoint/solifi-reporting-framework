@@ -4,14 +4,18 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
-    * [Release 1.0.7](#release-107)
+    * [Release 1.0.9](#release-109)
         * [Schema Changes](#schema-changes)
-    * [Release 1.0.6](#release-106)
+    * [Release 1.0.8](#release-108)
         * [Schema Changes](#schema-changes-1)
-    * [Release 1.0.5](#release-105)
+    * [Release 1.0.7](#release-107)
         * [Schema Changes](#schema-changes-2)
-    * [Release 1.0.4](#release-104)
+    * [Release 1.0.6](#release-106)
         * [Schema Changes](#schema-changes-3)
+    * [Release 1.0.5](#release-105)
+        * [Schema Changes](#schema-changes-4)
+    * [Release 1.0.4](#release-104)
+        * [Schema Changes](#schema-changes-5)
     * [Release 1.0.3](#release-103)
   * [Supported Deployment Methods](#supported-deployment-methods)
   * [Supported Backend Databases](#supported-backend-databases)
@@ -44,6 +48,32 @@
 ## Change Log
 
 Note: **Not all schemas are available for all clients, please get in touch with LimePoint support for any clarifications.**
+
+### Release 1.0.9
+
+**Changes**
+1. The application will now halt instead of logging a warning if it encounters errors stemming from invalid configurations, such as incorrect schema registry values, during the process of data deserialization.
+
+##### Schema Changes
+
+This release will delete the below column, which could result in a potential data loss.
+
+|   | Topic Name         | Fields Added | Fields Deleted | Other Updates | Status         |
+|---|--------------------|--------------|----------------|---------------|----------------|
+| 1 | ls_check_history_n |              | ch_currency    |               | Existing Topic |
+|   |                    |              |                |               |                |
+
+
+### Release 1.0.8
+
+**Changes**
+1. Any data filed mismatches between what's sent and what is in the database will throw an exception and add into error_log table.
+
+##### Schema Changes
+|   | Topic Name                  | Fields Added | Fields Deleted | Other Updates | Status    |
+|---|-----------------------------|--------------|----------------|---------------|-----------|
+| 1 | ls_variabl_variable_date_ph |              |                |               | New Topic |
+|   |                             |              |                |               |           |
 
 ### Release 1.0.7
 
