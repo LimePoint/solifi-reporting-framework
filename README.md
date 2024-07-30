@@ -4,18 +4,20 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
-    * [Release 1.0.9](#release-109)
+    * [Release 1.0.10](#release-1010)
         * [Schema Changes](#schema-changes)
-    * [Release 1.0.8](#release-108)
+    * [Release 1.0.9](#release-109)
         * [Schema Changes](#schema-changes-1)
-    * [Release 1.0.7](#release-107)
+    * [Release 1.0.8](#release-108)
         * [Schema Changes](#schema-changes-2)
-    * [Release 1.0.6](#release-106)
+    * [Release 1.0.7](#release-107)
         * [Schema Changes](#schema-changes-3)
-    * [Release 1.0.5](#release-105)
+    * [Release 1.0.6](#release-106)
         * [Schema Changes](#schema-changes-4)
-    * [Release 1.0.4](#release-104)
+    * [Release 1.0.5](#release-105)
         * [Schema Changes](#schema-changes-5)
+    * [Release 1.0.4](#release-104)
+        * [Schema Changes](#schema-changes-6)
     * [Release 1.0.3](#release-103)
   * [Supported Deployment Methods](#supported-deployment-methods)
   * [Supported Backend Databases](#supported-backend-databases)
@@ -48,6 +50,24 @@
 ## Change Log
 
 Note: **Not all schemas are available for all clients, please get in touch with LimePoint support for any clarifications.**
+
+### Release 1.0.10
+
+##### Schema Changes
+
+New columns will be added into existing tables.
+
+|   | Topic Name                | Fields Added         | Fields Deleted | Other Updates | Status         |
+|---|---------------------------|----------------------|----------------|---------------|----------------|
+| 1 | ls_gl_history_nf          | gh_unique_trans_id   |                |               | Existing Topic |
+| 2 | ls_ctd_pymthist_nf        | h_direct_debit_file  |                |               | Existing Topic |
+|   |                           | h_unique_trans_id    |                |               |                |
+| 3 | cs_defaults_nf            | cd_primary_currency  |                |               | Existing Topic |
+| 4 | il_gl_transfer_journal_nf | tj_gl_fund_exch_rate |                |               | Existing Topic |
+|   |                           | tj_gl_fund_currency  |                |               |                |
+|   |                           | tj_gl_currency       |                |               |                |
+|   |                           |                      |                |               |                |
+
 
 ### Release 1.0.9
 
