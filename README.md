@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
+    * [Release 1.0.11](#release-1011)
     * [Release 1.0.10](#release-1010)
         * [Schema Changes](#schema-changes)
     * [Release 1.0.9](#release-109)
@@ -50,6 +51,10 @@
 ## Change Log
 
 Note: **Not all schemas are available for all clients, please get in touch with LimePoint support for any clarifications.**
+
+### Release 1.0.11
+
+- The `insert_date` column in the audit tables now honour the property `data.timezone` unlike previous versions where this property was only used for non-audit tables and defaulted to `UTC`. Fixes MINTSD-1344.
 
 ### Release 1.0.10
 
