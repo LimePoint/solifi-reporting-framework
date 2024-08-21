@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
+    * [Release 1.0.12](#release-1012)
     * [Release 1.0.11](#release-1011)
     * [Release 1.0.10](#release-1010)
         * [Schema Changes](#schema-changes)
@@ -51,6 +52,22 @@
 ## Change Log
 
 Note: **Not all schemas are available for all clients, please get in touch with LimePoint support for any clarifications.**
+
+### Release 1.0.12
+
+##### Schema Changes
+|   | Topic Name                  | Fields Added | Fields Deleted | Other Updates | Status    |
+|---|-----------------------------|--------------|----------------|---------------|-----------|
+| 1 | as_fed_depr_nf              |              |                |               | New Topic |
+| 2 | as_oper_depr_nf             |              |                |               | New Topic |
+| 3 | de_addl_pymt_dap_bi_key_ph  |              |                |               | New Topic |
+| 4 | de_addl_pymt_detail_nf      |              |                |               | New Topic |
+| 5 | de_pymt_detail_nf           |              |                |               | New Topic |
+| 6 | ls_add_ausr_additional_data |              |                |               | New Topic |
+| 7 | ls_chng_log_nf              |              |                |               | New Topic |
+| 8 | re_master_nf                |              |                |               | New Topic |
+|   |                             |              |                |               |           |
+
 
 ### Release 1.0.11
 
