@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
+    * [Release 1.1.1](#release-111)
     * [Release 1.0.12](#release-1012)
     * [Release 1.0.11](#release-1011)
     * [Release 1.0.10](#release-1010)
@@ -51,7 +52,10 @@
 
 ## Change Log
 
-Note: **Not all schemas are available for all clients, please get in touch with LimePoint support for any clarifications.**
+### Release 1.1.1
+
+This release adds support for all schemas supported by ILS (1.24.15), Originations FMO (1.24.15) and PM-CMS (1.24.12) applications.  
+Also added support to automatically map all topics ending with `_v2` in ILS to their respective backend schemas.
 
 ### Release 1.0.12
 
