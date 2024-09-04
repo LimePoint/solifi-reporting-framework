@@ -5,6 +5,7 @@
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
     * [Release 1.1.1](#release-111)
+    * [Release 1.1.2](#release-112)
     * [Release 1.0.12](#release-1012)
     * [Release 1.0.11](#release-1011)
     * [Release 1.0.10](#release-1010)
@@ -51,6 +52,10 @@
 <!-- TOC -->
 
 ## Change Log
+
+### Release 1.1.2
+
+This release adds support for all schemas supported by Asset Based Lending - ABL (1.24.15) application.  
 
 ### Release 1.1.1
 
