@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
+    * [Release 1.1.3](#release-113)
     * [Release 1.1.2](#release-112)
     * [Release 1.1.1](#release-111)
     * [Release 1.0.12](#release-1012)
@@ -52,6 +53,10 @@
 <!-- TOC -->
 
 ## Change Log
+
+### Release 1.1.3
+
+Updated schemas for ILS 1.24.17.
 
 ### Release 1.1.2
 
