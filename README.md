@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
+    * [Release 1.1.4](#release-114)
     * [Release 1.1.3](#release-113)
     * [Release 1.1.2](#release-112)
     * [Release 1.1.1](#release-111)
@@ -53,6 +54,10 @@
 <!-- TOC -->
 
 ## Change Log
+
+### Release 1.1.4
+
+Added support for Originations ROS as of version 1.24.13.
 
 ### Release 1.1.3
 
