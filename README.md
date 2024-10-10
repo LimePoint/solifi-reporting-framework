@@ -4,34 +4,15 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
-    * [Release 1.1.4](#release-114)
-    * [Release 1.1.3](#release-113)
-    * [Release 1.1.2](#release-112)
-    * [Release 1.1.1](#release-111)
-    * [Release 1.0.12](#release-1012)
-    * [Release 1.0.11](#release-1011)
-    * [Release 1.0.10](#release-1010)
-        * [Schema Changes](#schema-changes)
-    * [Release 1.0.9](#release-109)
-        * [Schema Changes](#schema-changes-1)
-    * [Release 1.0.8](#release-108)
-        * [Schema Changes](#schema-changes-2)
-    * [Release 1.0.7](#release-107)
-        * [Schema Changes](#schema-changes-3)
-    * [Release 1.0.6](#release-106)
-        * [Schema Changes](#schema-changes-4)
-    * [Release 1.0.5](#release-105)
-        * [Schema Changes](#schema-changes-5)
-    * [Release 1.0.4](#release-104)
-        * [Schema Changes](#schema-changes-6)
-    * [Release 1.0.3](#release-103)
+    * [Release 2.0.1](#release-201)
+  * [Overview](#overview)
   * [Supported Deployment Methods](#supported-deployment-methods)
   * [Supported Backend Databases](#supported-backend-databases)
   * [Access To LimePoint Support](#access-to-limepoint-support)
   * [Java Version Support](#java-version-support)
   * [Anatomy Of The Consumer](#anatomy-of-the-consumer)
     * [The Consumer Application](#the-consumer-application)
-    * [Understanding Application.yaml File](#understanding-applicationyaml-file)
+    * [Understanding Application.yml File](#understanding-applicationyml-file)
   * [Deployment Methods](#deployment-methods)
     * [Deploying Standalone](#deploying-standalone)
     * [Deploying As Docker Container](#deploying-as-docker-container)
@@ -55,163 +36,17 @@
 
 ## Change Log
 
-### Release 1.1.4
+### Release 2.0.1
 
-Added support for Originations ROS as of version 1.24.13.
+#### Architecture Changes
 
-### Release 1.1.3
+Version 1 of the consumer relied on SQL files to manage database tables. This approach had some key limitations, as any schema changes in the upstream Solifi broker required us to release a new version of the consumer to stay aligned. From version 2.x onward, we restructured how schema changes are handled. Instead of shipping SQL files, the consumer now detects the required schemas from the Schema Registry and dynamically creates or updates tables in the backend database.
 
-Updated schemas for ILS 1.24.17.
-
-### Release 1.1.2
-
-This release adds support for all schemas supported by Asset Based Lending - ABL (1.24.15) application.  
-
-### Release 1.1.1
-
-This release adds support for all schemas supported by ILS (1.24.15), Originations FMO (1.24.15) and PM-CMS (1.24.12) applications.  
-Also added support to automatically map all topics ending with `_v2` in ILS to their respective backend schemas.
-
-### Release 1.0.12
-
-##### Schema Changes
-|   | Topic Name                  | Fields Added | Fields Deleted | Other Updates | Status    |
-|---|-----------------------------|--------------|----------------|---------------|-----------|
-| 1 | as_fed_depr_nf              |              |                |               | New Topic |
-| 2 | as_oper_depr_nf             |              |                |               | New Topic |
-| 3 | de_addl_pymt_dap_bi_key_ph  |              |                |               | New Topic |
-| 4 | de_addl_pymt_detail_nf      |              |                |               | New Topic |
-| 5 | de_pymt_detail_nf           |              |                |               | New Topic |
-| 6 | ls_add_ausr_additional_data |              |                |               | New Topic |
-| 7 | ls_chng_log_nf              |              |                |               | New Topic |
-| 8 | re_master_nf                |              |                |               | New Topic |
-|   |                             |              |                |               |           |
-
-
-### Release 1.0.11
-
-- The `insert_date` column in the audit tables now honour the property `data.timezone` unlike previous versions where this property was only used for non-audit tables and defaulted to `UTC`. Fixes MINTSD-1344.
-
-### Release 1.0.10
-
-##### Schema Changes
-
-New columns will be added into existing tables.
-
-|   | Topic Name                | Fields Added         | Fields Deleted | Other Updates | Status         |
-|---|---------------------------|----------------------|----------------|---------------|----------------|
-| 1 | ls_gl_history_nf          | gh_unique_trans_id   |                |               | Existing Topic |
-| 2 | ls_ctd_pymthist_nf        | h_direct_debit_file  |                |               | Existing Topic |
-|   |                           | h_unique_trans_id    |                |               |                |
-| 3 | cs_defaults_nf            | cd_primary_currency  |                |               | Existing Topic |
-| 4 | il_gl_transfer_journal_nf | tj_gl_fund_exch_rate |                |               | Existing Topic |
-|   |                           | tj_gl_fund_currency  |                |               |                |
-|   |                           | tj_gl_currency       |                |               |                |
-|   |                           |                      |                |               |                |
-
-
-### Release 1.0.9
-
-**Changes**
-1. The application will now halt instead of logging a warning if it encounters errors stemming from invalid configurations, such as incorrect schema registry values, during the process of data deserialization.
-
-##### Schema Changes
-
-This release will delete the below column, which could result in a potential data loss.
-
-|   | Topic Name         | Fields Added | Fields Deleted | Other Updates | Status         |
-|---|--------------------|--------------|----------------|---------------|----------------|
-| 1 | ls_check_history_n |              | ch_currency    |               | Existing Topic |
-|   |                    |              |                |               |                |
-
-
-### Release 1.0.8
-
-**Changes**
-1. Any data filed mismatches between what's sent and what is in the database will throw an exception and add into error_log table.
-
-##### Schema Changes
-|   | Topic Name                  | Fields Added | Fields Deleted | Other Updates | Status    |
-|---|-----------------------------|--------------|----------------|---------------|-----------|
-| 1 | ls_variabl_variable_date_ph |              |                |               | New Topic |
-|   |                             |              |                |               |           |
-
-### Release 1.0.7
-
-**Changes**
-1. License start date is validated. Application will not be started before the start date in the license.
-2. Executing ddl scripts can be disabled using spring.liquibase.enabled configuration if client desire to maintain the database on their own. 
-
-**Bug fixes**
-1. Fixed a class loading issue thrown when running the application through the jar.
-
-##### Schema Changes
-No new schema changes
-
-### Release 1.0.6
-
-**Changes**
-1. Introduced auditing functionality. If Audits are enabled, audit tables are created and data is inserted for auditing. Refer the section [Auditing](#auditing) later in this document.
-
-##### Schema Changes
-
-|   | Topic Name                  | Fields Added | Fields Deleted | Other Updates | Status    |
-|---|-----------------------------|--------------|----------------|---------------|-----------|
-| 1 | as_add_ausr_additional_data |              |                |               | New Topic |
-| 2 | as_fed_depr_nf              |              |                |               | New Topic |
-| 3 | as_oper_depr_nf             |              |                |               | New Topic |
-| 4 | data_streaming              |              |                |               | New Topic |
-| 5 | ls_add_ausr_additional_data |              |                |               | New Topic |
-| 6 | ls_pymt_schedule_nf         |              |                |               | New Topic |
-| 7 | re_master_nf                |              |                |               | New Topic |
-|   |                             |              |                |               |           |
-
-### Release 1.0.5
-
-**Changes**  
-1. Introduced error_log table to log any data related errors when consuming from upstream brokers. This table will store any events that the Consumer could not process. Refer the section [Error Handling](#error-handling) later in this document.
-2. The consumer will now add default values for fields as outlined in the **Schema Changes** table below. 
-
-**Bug fixes**  
-1. Switched `TIMESTAMP` to `DATETIME` to accept negative timestamp values for MySQL and MariaDb database to overcome the date limitation.
-2. Downsized the size of `VARCHAR` columns from `VARCHAR(4000)` to `VARCHAR(100)` to avoid exceeding row size limitations for MariaDB and MySQL.
-3. Fields with logical type `timestamp-micros` will be considered as a timestamp equivalent column, similar to logical type `timestamp-millis`.
-
-##### Schema Changes
-
-|   | Topic Name     | Fields Added | Fields Deleted | Other Updates                                                               | Status         |
-|---|----------------|--------------|----------------|-----------------------------------------------------------------------------|----------------|
-| 1 | addl_lessor_nf |              |                | - **al_tax_engine**: Field default value is changed from **null** to **I**. | Existing Topic |
-|   |                |              |                |                                                                             |                |
-
-
-### Release 1.0.4
-
-This release has some minor bug fixes.
-
-1. Fixed a date conversion issue for mandatory date fields.
-2. Internal enhancements and code cleanups (Removed internal code structure for producer and set default values for optional fields).
-3. Disabled automatic topic creations by consumer.
-4. Enhanced logging capability for more clarity on the logs.
-
-##### Schema Changes
-
-|   | Topic Name      | Fields Added | Fields Deleted | Other Updates                                                                                | Status         |
-|---|-----------------|--------------|----------------|----------------------------------------------------------------------------------------------|----------------|
-| 1 | as_open_item_nf |              |                |                                                                                              | New Topic      |
-| 2 | as_user3_nf     |              |                |                                                                                              | New Topic      |
-| 3 | ds_connector_2  |              |                | - **last_update_ts**: logical type has changed from _timestamp-millis_ to _timestamp-micros_ | Existing Topic |
-|   |                 |              |                |                                                                                              |                |
-
-### Release 1.0.3
-
-This release introduces breaking changes for customers that are on version **1.0.2** or lower. Please contact LimePoint support if you are upgrading to **1.0.3**. For fresh installations please be aware of the new configurations this release introduces.
-
-1. Enhanced license validation introduced and exposed via config **solifi.license.path** and **solifi.license.signature.path**. Please get in touch with LimePoint support to grab the new licenses. Property **solifi.license.enc** has been deprecated and removed.
-2. Added config **solifi.data.timezone** to allow custom timezones when persisting data in the target databases. Default would be system timezone where the consumer application runs. Values should be as a [TZ Identifier](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). eg: Australia/Adelaide. Updating this config will **change** existing records. To update the tables with a timezone value, simply change the config in application.yml and restart the consumer application with a new groupID or reset the offset of the existing topics for the existing groupID.
-3. Enhanced how the consumer app handles table metadata and change management. This change will now allow customers running multiple copies of the consumer application across platforms and point to the same database. e.g One instance can run on docker and another instance can run as a standalone and both instances can write to the same database.
+When running the consumer for the first time, you might see errors in the logs related to table creation. These can be safely ignored, as they are caused by multiple threads attempting to create the same table simultaneously.
 
 ---
+
+## Overview
 
 Solifi Realtime Reporting application is a Kafka Consumer that allows customers to read messages from Solifi brokers and persist it in the database of choice. The consumer is generic and can be used by any customer using Solifi services and allows modifications via configuration files.
 
@@ -224,11 +59,15 @@ The consumer provides the following functionalities:
 5. Access to LimePoint Support Portal.
 6. Free consumer upgrades when changes occur in upstream Solifi.
 
+## Network Diagram
+
+![Network Placement](imgs/arch.png)
+
 ## Supported Deployment Methods
 The consumer can be deployed as a standalone Java application or as a container.
 
 ## Supported Backend Databases
-The consumer can persist messages to the following databases:
+The consumer can persist messages to the following databases, these can be either on-prem or as PaaS.
 
 1. Postgres SQL
 2. Microsoft SQL
@@ -244,24 +83,22 @@ To get access to any issues related to the workings of the consumer, customers s
 ## Java Version Support
 The consumer is supported with the following Java versions:
 
-1. OpenJDK 11
+1. OpenJDK 17
 
 ## Anatomy Of The Consumer
 The consumer artefact consists for three important files which are all required for it to function properly, viz.
 
 1. The Java archive (solifi-consumer-<version>.jar)
 2. A license files (license.license and signature file)
-3. A sample application.yaml file
+3. A sample application.yml file
 
 ### The Consumer Application
-The consumer application has inbuilt functionality to manage the backend database schemas. When the consumer starts for the first time, it checks if the database has the required schemas. If the schemas are missing, it will create all the schemas that it is aware of. Note that the consumer **will** create all schemas it knows of, irrespective of the schemas you may want. However, it will only persist messages in the schemas that you specify in the `application.yaml` file as discussed later in this document.
+The consumer application includes built-in functionality to manage backend database schemas. It automatically creates a table for each topic and, if needed, an accompanying audit table. The tables are adjusted based on the messages received. However, the consumer only creates or modifies tables for the topics specified in the application.yml file. For example, while the ILS application may have over 600 topics, if only 10 topics are listed in your application.yml file, the consumer will create tables for just those 10 topics.
 
-When Solifi publishes new schemas or makes changes to existing schemas, LimePoint will publish a new Consumer Jar/docker image. Once the new app is started, it will detect what changes are required to the backend database and make appropriate changes. The changes are idempotent in nature, i.e. the consumer won't make any changes to the database schemas if they already are up-to date.
+### Understanding Application.yml File
+The behavior of the consumer is configured through the application.yml file. This file instructs the consumer on which brokers to read data from, which backend database to persist the data to, how many threads to run, and more. You can remove any configurations that are not relevant to your use case from the application.yaml. The sample below demonstrates all the currently supported configuration options. Any field marked as optional can be left out.
 
-### Understanding Application.yaml File
-The behavior of the consumer is controlled via an application.yaml file. This file directs the consumer on which brokers to read data from, what backend database to persist data to, how many threads to run etc. You can strip out configurations that you don't need in your application.yaml. The sample below shows all possible configurations that are currently supported. 
-
-```yaml
+```yml
 spring:
   kafka:
     consumer:
@@ -272,14 +109,10 @@ spring:
         registry:
           url: # e.g. https://myabc-123.ap-southeast-2.aws.confluent.cloud; This is the address of your schema registry. You can get this information from your Solifi representative. 
           basic.auth.user.info: API-KEY:API-SECRET # e.g. AOI8hCTKKA:51m2VSl0yn3515ixYLJN7S0ykawEMo5qtm2E2; Credentials to connect to the schema registry. This is the address of your schema registry. You can get this information from your Solifi representative.
-      ssl.endpoint.identification.algorithm: https
-      sasl.mechanism: PLAIN
       security.protocol: SASL_SSL
-      retry.backoff.ms: 500
-      basic.auth.credentials.source: USER_INFO
       sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="API-KEY" password="API-SECRET"; # e.g You must enter your username and password for Kakfa here. You can get this information from your Solifi representative.
       #partition.assignment.strategy: # This is optional. Will default to RangeAssignor if not provided. eg: org.apache.kafka.clients.consumer.RoundRobinAssignor, org.apache.kafka.clients.consumer.StickyAssignor, org.apache.kafka.clients.consumer.RangeAssignor
-  # Datasources control where the messages are stored in the backend.
+  # Datasources control where the messages are stored in the backend. Atleast one backend source must be specified.
   datasource:
     ## Microsoft SQL
     #url: <sql server names>
@@ -311,52 +144,57 @@ spring:
     #driver-class-name: org.mariadb.jdbc.Driver
     #username: root
     #password: mariadb123
-  # The consumer uses Liquibase to manage and maintain the schemas in the target database. We use two properties to direct Liquibase on the type of database and prefix to be used.
-  # liquibase.database.type # database type client uses.
-  # liquibase.client.prefix # client prefix used in the schema registry. Same as the value of _solifi.prefix_ in application.yaml
-  liquibase:
-    #enabled: true # by default this is true. This should be set to 'false' if ddl scripts shouldn't be executed through solifi-consumer application. In such case, client needs to take responsibility in running their own scripts to generate the tables and make sure the tables are ready with correct columns before starting the application. Any future changes usually received and handled through updating solifi-consumer, will also need to be handled by the client.
-    parameters:
-      liquibase:
-        client:
-          prefix: # Client prefix for Solifi brokers. e.g. uat.myabc.ILS.canonical. Same as solifi.prefix
-        database:
-          type: sqlserver # database type used by the client. supported types: mariadb, mysql, oracle, postgres, sqlserver
-    
-logging:
+logging: # Optional. # The consumer by default uses the log level of INFO. You can change that behavior via the following property. Please be aware that if you change the log level to DEBUG, the consumer will log records in clear text. Those records may contain sensitive data. It is therefore advised to use the DEBUG mode only sparingly.
   level:
-    com.limepoint.solifi: INFO
+    com.limepoint.solifi: DEBUG
 
 solifi:
-  topics: # List of topics client wishes to consume from Solifi brokers. Note that the topic names must not have any prefix.
-  #- addl_lessor_nf
-  #- addl_parame_euro_dd_lessors
-  #- address_nf
-  concurrency: 5 # for better performance this should be equal to the topic partition count
-  prefix: # Client prefix for Solifi brokers. e.g. uat.myabc.ILS.canonical
+  prefix: # Client prefix for Solifi brokers. e.g. uat.myabc.ILS.canonical. You would get this information from Solifi.
+  suffix: _v2 # Optional. if specified, consumer will remove the `_v2` from the name of the topic and create the table without it. e.g. if the topic name is addl_lessor_nf_v2, the table will be created as addl_lessor_nf
+  topics: # List of topics client wishes to consume from Solifi brokers. Note that the topic names must not have any prefix. The format is <topic_name>:<table_name>:<audit_table_name>. Everything except <topic_name> is optional.
+    - addl_lessor_nf
+    - cs_master_nf
+    - address_nf
+  audit: # Optional.
+    enabled: true # Optional. defaults to false. Setting it to true will create audit tables. See what audit tables do later in the document.
+    include-all: true # default true. If enabled is set to true, consumer will create audit tables for all topics listed under topics heading.
+    audit-suffix: _audit # the suffix value to be used when creating audit tables, e.g. this will create a audit table named addl_lessor_nf_audit.
+  concurrency: 5 # Optional. This dicates number of listener threads per consumer. It defaults to the server it is running on (usually 8 or 10). For better performance this should be equal to the topic partition count but most of the customers use the default value.
   license:
     path: # Path of the license file provided by LimePoint.
     signature:
       path: # Path of the signature file provided by LimePoint.
-  data.timezone: # TZ identifier in TZDB. Refer: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not present, reads the default system timezone and saves timestamp values in system timezone.
-  audit-tables: # Topics which needs to be audited. Depending on this, audit tables will be created and data will be inserted to audit tables. Empty config will not create any audit tables.
-  #- all
-  #- addl_lessor_nf
-  #- addl_parame_euro_dd_lessors
-  #- address_nf
+  timezone: # Optional. TZ identifier in TZDB. Refer: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not present, all date and time are stored in UTC. If present, values are stored by converting them from UTC to the specified value. Remember that we don't store the Timezone value in the database. The date/time will either be in UTC or converted to the TZ. We recommend keeping all values in UTC and not specify this property.
+server: # Optional. Specifies the port the consumer should expose for monitoring and other statistics.
+  port: 8080
 ```
+
+## Health & Monitoring
+
+The consumer exposes a bunch of endpoints for health check and statistics, some of the key endpoints are as below:
+
+| URI                | Description |
+|--------------------------|----------------------|
+| /actuator/info           | Shows/returns the version of the Consumer and License information   |
+| /actuator/health         | Shows/returns the health of the consumer |
+| /actuator/metrics/<metric_name> | Shows/returns the value of the specified metric. You can hit /actuator/metrics to see the list of metrics available. |
+| /actuator                | Shows all endpoints available. |
+|     
+
+The URIs can be accessed depending on the hosted platform, e.g. when hosting on docker and exposing port 8080, the above endpoints can be accessed via http://localhost:8080/actuator.
+
 
 ## Deployment Methods
 
-You must have your license file ready and the application.yaml file ready before you start the deployment.
+You must have your license file ready and the application.yml file ready before you start the deployment.
 
 ### Deploying Standalone
 
 To deploy as a standalone application:
 
 * Download the latest solifi-consumer-<version>.jar. Reach out to LimePoint Support on how to get access.
-* Place the application.yaml in the same folder as the jar.
-* Place the license.enc file in a desired folder and update the path in the application.yaml.
+* Place the application.yml in the same folder as the jar.
+* Place the license.enc file in a desired folder and update the path in the application.yml.
 * Make sure you are in the same folder as the jar file and application.yml file and run the jar file using the below command. This will start the application and create the database tables and start consuming from the kafka topics specified under _solifi.topics_ config.
 
 ````bash
@@ -368,47 +206,75 @@ java -jar solifi-consumer-<version>.jar
 To deploy the consumer as a container, you must have access to LimePoint's docker hub. Please reach out to LimePoint Support to get your access. Once you have access to the repositories, login and pull the image.
 ```bash
 docker login -u <username_provided_by_limepoint_support> # Use the password provided by support when prompted
-docker image pull limepoint/solifi-reporting:<version>
+docker image pull limepoint/solifi-consumer:<version>
 ```
 
-To run in a docker container, a docker compose file needs to be created. Make sure the application configs are placed correctly where the application could read and the paths in the configs are updated in the correct path formats. Below is a sample docker file. 
-You should also make sure the environmental variable, spring.config.additional-location is passed in correctly pointing to the application.yml path.
+To run in a docker container, a docker compose file needs to be created. Make sure the application configs are placed correctly where the application could read and the paths in the configs are updated in the correct path formats. Below is a sample docker file that starts the consumer and an MSSQL database. You can remove the MSSQL database if you have your own DB. Ensure that you have specified the correct details for the database in application.yml for the consumer.
 ````
 services:
   solifi-consumer:
-    image: limepoint/solifi-reporting:<version>
+    image: limepoint/solifi-consumer:2.0.1 # replace with version
+    networks:
+      - lp_sol_demo
     volumes:
-      - /<path_of_application.yaml_on_your_system>:/application.yaml
-      - /<path_of_license_file_on_your_system>:/license.license
-      - /<path_of_signature_file_on_your_system>:/sign256.sign
+      - ./application.yml:/application.yml
+      - ./license.license:/license.license
+      - ./sign256.sign:/sign256.sign
     environment:
-      - spring.config.additional-location=/application.yml # path of the application.yaml file
+      - spring.config.additional-location=/application.yml
+      - JAVA_OPTS=-XX:MaxDirectMemorySize=64m
+    ports:
+      - "8080:8080" # ports to expose, must match the second port in application.yml
+    depends_on:
+      mssqldb:
+        condition: service_healthy
+  mssqldb:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    hostname: mssqldb
+    container_name: mssqldb
+    ports:
+      - "1440:1433"
+    environment:
+      ACCEPT_EULA: 1
+      MSSQL_SA_PASSWORD: Welcome123$
+    networks:
+      - sol_demo
+    healthcheck:
+      test: ["CMD", "echo", ">", "/dev/tcp/mssqldb/1433"]
+      interval: 10s
+      retries: 3
+      start_period: 30s
+      timeout: 5s
+networks:
+  sol_demo:
+    name: sol_demo
+
 ````
 
 Start-up the docker container using, 
 ````
-docker compose up
+docker compose up -d
 ````
 
 ### Deploying on Azure Kubernetes (AKS)
 
 To deploy to AKS, you must first create the required infrastructure. For example, you must create the AKS cluster. If you are planning to use MS SQL, you must also create the database services. 
 
-Since the consumer requires `application.yaml` and `license` files to function correctly, you must make provisions for the Consumer to read those configurations. One way to do that is to make use of `configMaps`. 
+Since the consumer requires `application.yml` and `license` files to function correctly, you must make provisions for the Consumer to read those configurations. One way to do that is to make use of `configMaps`. 
 
 #### Create ConfigMaps
-Use the following commands to create configMaps to store the contents of the license file and the application.yaml file.
+Use the following commands to create configMaps to store the contents of the license file and the application.yml file.
 ````
-kubectl create configmap consumer-config --from-file=application.yaml --from-file=license.license --from-file=sign256.sign 
+kubectl create configmap consumer-config --from-file=application.yml --from-file=license.license --from-file=sign256.sign 
 kubectl describe configmaps consumer-config
-kubectl edit configmap -n <namespace> <configMapName> -o yaml
+kubectl edit configmap -n <namespace> <configMapName> -o yml
 
 # apply update to ConfigMap using dry-run and replace
-kubectl create configmap consumer-config  --from-file=license.license --from-file=sign256.sign --from-file=application.yml -o yaml --dry-run=client | kubectl replace -f -
+kubectl create configmap consumer-config  --from-file=license.license --from-file=sign256.sign --from-file=application.yml -o yml --dry-run=client | kubectl replace -f -
 ````
 
 #### Create Deployment
-You must now create the `deployment.yaml` to allow AKS to deploy your configurations.
+You must now create the `deployment.yml` to allow AKS to deploy your configurations.
 ````
 apiVersion : apps/v1
 kind: Deployment
@@ -426,11 +292,11 @@ spec:
     spec:
       containers: # A pod wraps one or more containers. Here we define all containers
         - name: solificonsumer-container 
-          image: limepoint/solifi-reporting:<version>
+          image: limepoint/solifi-consumer:<version>
           #imagePullPolicy: Always #This is optional. Default would be 'IfNotPresent'. Change to 'Always' if need to pull the image whenever pod restarts.
           env: 
           - name: spring.config.additional-location
-            value: "/config/application.yaml"
+            value: "/config/application.yml"
           volumeMounts: # mount the volume in to the container
           - name: config-volume
             mountPath: /config
@@ -442,17 +308,17 @@ spec:
           configMap: 
             name: consumer-config  
             items:
-            - key: "application.yaml"
-              path: "application.yaml" 
+            - key: "application.yml"
+              path: "application.yml" 
             - key: "license.license"
               path: "license.license"
             - key: "sign256.sign"
               path: "sign256.sign"   
 ````
 
-Apply the deployment.yaml. This will create a new deployment under 'Azure Workloads' and start-up the 'solificonsumer' container pods.
+Apply the deployment.yml. This will create a new deployment under 'Azure Workloads' and start-up the 'solificonsumer' container pods.
 ````
-kubectl apply -f ./deployment.yaml
+kubectl apply -f ./deployment.yml
 ````
 
 #### Validate Container Logs
@@ -485,8 +351,8 @@ Start an instance of solifi-consumer.jar as Consumer1 with TopicA(update the app
 ````
 ...
 solifi:
-    topics:
-        - TopicA
+  topics:
+    - TopicA
 ...
 ````
 Run,
@@ -497,8 +363,8 @@ Start another instance of solifi-consumer.jar as Consumer2 with TopicB by copyin
 ````
 ...
 solifi:
-    topics:
-        - TopicB
+  topics:
+    - TopicB
 ...
 ````
 Run,
@@ -516,9 +382,9 @@ Start an instance of solifi-consumer.jar as Consumer1 with TopicA & TopicB.
 ````
 ...
 solifi:
-    topics:
-        - TopicA
-        - TopicB
+  topics:
+    - TopicA
+    - TopicB
 ...
 ````
 Run,
@@ -528,9 +394,9 @@ Start a different instance of solifi-consumer.jar as Consumer2 with TopicB & Top
 ````
 ...
 solifi:
-    topics:
-        - TopicB
-        - TopicC
+  topics:
+    - TopicB
+    - TopicC
 ...
 ````
 Run,
@@ -540,8 +406,8 @@ Start another instance of solifi-consumer.jar as Consumer3 with TopicD by copyin
 ````
 ...
 solifi:
-    topics:
-        - TopicD
+  topics:
+    - TopicD
 ...
 ````
 Run,
@@ -559,9 +425,7 @@ You need to update the application.yml file according to the environment.
 Additionally, if it is a kubernetes deployment and configMaps are used, then configMaps of that namespace should also be updated.
 
 ## Handling Date & Time
-1. You would notice a warning log, **_[WARNING] Ignoring invalid logical type for name: date_** during solifi-consumer execution. The reason is due to a mismatch of a data type sent from Solifi.  Usually "logicalType" represented in avro schema for _date_ fields are expected to be of "type" _int_, but Solifi sends date fields as _long_ values. Therefore, the fields are generated as Long fields, which is warned through this warning log. For more details check on the [avro spec](https://avro.apache.org/docs/1.10.2/spec.html#:~:text=with%20RFC%2D4122-,Date,-The%20date%20logical). 
-2. The timestamp-millis logical type represents an instant on the global timeline, independent of a particular time zone or calendar, with a precision of one millisecond. Please note that time zone information gets lost in this process. Upon reading a value back, we can only reconstruct the instant, but not the original representation. In practice, such timestamps are typically displayed to users in their local time zones, therefore they may be displayed differently depending on the execution environment. For more information read on the [timestamp-millis in avro spec](https://avro.apache.org/docs/1.10.2/spec.html#:~:text=00%3A00%3A00.000000.-,Timestamp,-(millisecond%20precision)). To avoid such misrepresentations we have introduced the **solifi.data.timezone** configuration where the desired timezone to be saved in the database could be decided. This config value needs to be in TZ identifier format (If not provided will default to system timezone, which is usually UTC in docker environments).
-3. Date fields will follow the same conditions as timestamp values (mentioned in above point 2) where the timezone will be controlled by **solifi.data.timezone** configuration. If not specified, system default timezone will be used (If not provided will default to system timezone, which is usually UTC in docker environments).
+As recommended above, it is recommended that all date and time be stored in UTC. This solves a lot of problems when dealing with date/time especially in regions with Daylight savings (DST). 
 
 ## Scaling Consumer Application
 Scaling is highly dependent on the number of partitions in a kafka topic. As per kafka concepts, consumers could be defined within a consumer group to listen to a topic in parallel. 
@@ -576,77 +440,51 @@ Additionally, if there is are topics with higher TPS, then clients could start u
 The consumer application captures any data related errors (e.g. invalid data) and loads them in the **error_log** table. This table gets created and managed by the Consumer during startup. Customers should keep track of the this table to lookup failed messages. The messages in this table are not cleaned up by the Consumer and it is expected that the clients cleanup as they see fit.
 
 ## Auditing
-Auditing can be enabled by specifying the topic names as a list in 'solifi.audit-tables' config in application.yml. If this is enabled, an additional audit table as <topicname>_audit will be created in the database. Any data changes in the main tables will be recorded in audit tables. Specify 'all' in the config if all tables need to be audited or leave empty if auditing should be disabled.
-Eg 1: Creates _audit tables for _all_ topics and inserts data whenever there is any change in the records of main table.
-````yaml
-solifi.audit-tables:
-  - all
-````
-
-Eg 2: Creates _audit tables only for addl_lessor_nf topic and inserts data only when addl_lessor_nf has any change in the records.
-````yaml
-solifi.audit-tables:
-  - addl_lessor_nf
-````
+Auditing can be enabled by specifying the topic names as a list in 'solifi.audit-tables' config in application.yml. If this is enabled, an additional audit table as <topicname>_audit will be created in the database. Any data changes in the main tables will be recorded in audit tables. See the struction of `application.yml` to understand the configurations for auditing.
 
 ### How Auditing Works
-**Scenario 1:** Any data 'insert' into main tables
-A similar record will be inserted into the audit table with all the metadata information, inserted user, entered time, revision and action (action=INSERT)
 
-Eg: Insert record
+**Scenario 1: Any insert or update event**
 
-_Main Table: ls_master_
+A similar record will be inserted into the audit table with partition, offset, action, kafka_date, inserted_user, insert_date columns in addition to the original columns of the table.
 
-| id | contract_number | invoice_date            |
-|----|-----------------|-------------------------|
-| 1  | ABC             | 2023-10-23 03:35:02.275 |
-
-_Audit Table: ls_master_audit_
-
-| id | revision | contract_number | invoice_date            | performed_action | inserted_user   | inserted_date           |
-|----|----------|-----------------|-------------------------|------------------|-----------------|-------------------------|
-| 1  | 1        | ABC             | 2023-10-23 03:35:02.275 | INSERT           | solifi-consumer | 2023-11-13 03:35:02.275 |
-
-**Scenario 2:** Any data 'update' into main table records
-Received updated record will be inserted into the audit table as a new record with all the metadata information, user, entered time, revision and action (action=UPDATE)
-
-Eg: Update record
+Eg: Insert or update record
 
 _Main Table: ls_master_
 
-| id | contract_number | invoice_date            |
-|----|-----------------|-------------------------|
-| 1  | ABCDEF          | 2023-10-23 03:35:02.275 |
+| id | contract_number | 
+|----|-----------------|
+| 1  | ABC             |
 
 _Audit Table: ls_master_audit_
 
-| id | revision | contract_number | invoice_date            | performed_action | inserted_user   | inserted_date           |
-|----|----------|-----------------|-------------------------|------------------|-----------------|-------------------------|
-| 1  | 1        | ABC             | 2023-10-23 03:35:02.275 | INSERT           | solifi-consumer | 2023-11-13 03:35:02.275 |
-| 1  | 2        | ABCDEF          | 2023-10-23 03:35:02.275 | UPDATE           | solifi-consumer | 2023-11-14 06:33:23.234 |
+| id | contract_number | partition | offset | action | kafka_date | inserted_user | insert_date|
+|----|-----------------|--------------|-----------|--------|--------|------------|---------------|
+| 1  | ABC             |  0 | 13  | UPSERT | 2023-11-13 03:35:02.275 | solifi-consumer | 2024-09-11 04:15:04.175 |
 
-**Scenario 3: Any data 'delete'**
-A record with null values will be inserted in to the audit table with all the metadata information, user, entered time, revision and action (action=DELETE)
+**Scenario 2: Any delete event**
+
+A record with null values will be inserted in to the audit table with all the metadata information and action delete, the record will be deleted from the main table.
 
 Eg: Delete record
 
 _Main Table: ls_master_
 
-| id | contract_number | invoice_date |
-|----|-----------------|--------------|
-|    | <No Records>    |              |
+| id | contract_number | 
+|----|-----------------|
+|    |                 |
 
 
 _Audit Table: ls_master_audit_
 
-| id | revision | contract_number | invoice_date            | performed_action | inserted_user   | inserted_date           |
-|----|----------|-----------------|-------------------------|------------------|-----------------|-------------------------|
-| 1  | 1        | ABC             | 2023-10-23 03:35:02.275 | INSERT           | solifi-consumer | 2023-11-13 03:35:02.275 |
-| 1  | 2        | ABCDEF          | 2023-10-23 03:35:02.275 | UPDATE           | solifi-consumer | 2023-11-14 06:33:23.234 |
-| 1  | 3        | null            | null                    | DELETE           | null            | null                    |
+| id | contract_number | partition | offset | action | kafka_date | inserted_user | insert_date|
+|----|-----------------|--------------|-----------|--------|--------|------------|---------------|
+| 1  | ABC             |  0 | 13  | UPSERT | 2023-11-13 03:35:02.275 | solifi-consumer | 2024-09-11 04:15:04.175 |
+| 1  |                 |  0 | 13  | DELETE | 2023-11-13 03:35:02.275 | solifi-consumer | 2024-09-11 04:15:04.175 |
 
-### Points to note 
 
-* Data in audit tables aren't cleaned up. It needs to be handled manually according to data retention policies.
-* Since auditing stores a copy of the data, additional storage is required. So you must plan the storage accordingly. Usually, if you enable auditing globally (via the ALL flag), you need approximately more than twice the storage.
+### Important Considerations When Enabling Auditing 
+
+* Data in audit tables aren't cleaned up. It needs to be handled manually according to data retention policies of your organization.
+* Since auditing stores a copy of the data, additional storage is required. So you must plan the storage accordingly. Usually, if you enable auditing for all tables, you need approximately more than twice the storage.
 * Any configuration changes do not come into effect without a restart of the consumer.
