@@ -4,6 +4,8 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
+    * [Release 2.0.3](#release-203)
+    * [Release 2.0.2](#release-202)
     * [Release 2.0.1](#release-201)
   * [Overview](#overview)
   * [Supported Deployment Methods](#supported-deployment-methods)
@@ -13,6 +15,9 @@
   * [Anatomy Of The Consumer](#anatomy-of-the-consumer)
     * [The Consumer Application](#the-consumer-application)
     * [Understanding Application.yml File](#understanding-applicationyml-file)
+    * [Sample Application.yml To Read All Topics](#sample-applicationyml-to-read-all-topics)
+    * [Sample Application.yml To Read Topics Matching A Pattern](#sample-applicationyml-to-read-topics-matching-a-pattern)
+    * [Sample Application.yml To Read Explicitly Defined Topics](#sample-applicationyml-to-read-explicitly-defined-topics)
   * [Deployment Methods](#deployment-methods)
     * [Deploying Standalone](#deploying-standalone)
     * [Deploying As Docker Container](#deploying-as-docker-container)
@@ -31,10 +36,18 @@
   * [Error Handling](#error-handling)
   * [Auditing](#auditing)
     * [How Auditing Works](#how-auditing-works)
-    * [Points to note](#points-to-note-)
+    * [Important Considerations When Enabling Auditing](#important-considerations-when-enabling-auditing)
 <!-- TOC -->
 
 ## Change Log
+
+### Release 2.0.3
+
+Introduced a new property `topics-regex` which when set will use a regex pattern matching to automatically look up topics matching the pattern. This saves writing down every topic you want to consume in the `application.yml` file. The default value for this property is set to `.*` and thus would read every topic available. The consumer periodically checks (every 5 mins) for topic list. With this feature, you no longer have to restart your consumer everytime you want to add a new topic. Once the topic is published/available upstream, the consumer should start reading that topic within 5 mins. If `topics-regex` and `topics` are both specified, `topics` takes precedence. If none are specified, `topics-regex` takes precedence. 
+
+### Release 2.0.2
+
+Updated the auditing tables to add a prefix of `lp_` for the columns so as to not conflict with other database columns.
 
 ### Release 2.0.1
 
@@ -59,12 +72,18 @@ The consumer provides the following functionalities:
 5. Access to LimePoint Support Portal.
 6. Free consumer upgrades when changes occur in upstream Solifi.
 
+---
+
 ## Network Diagram
 
 ![Network Placement](imgs/arch.png)
 
+---
+
 ## Supported Deployment Methods
 The consumer can be deployed as a standalone Java application or as a container.
+
+---
 
 ## Supported Backend Databases
 The consumer can persist messages to the following databases, these can be either on-prem or as PaaS.
@@ -77,13 +96,19 @@ The consumer can persist messages to the following databases, these can be eithe
 
 You must provide a user that can create/update database schemas in the database. The consumer comes pre-built with schema information and manages it automatically.
 
+---
+
 ## Access To LimePoint Support
 To get access to any issues related to the workings of the consumer, customers should raise a ticket at https://support.limepoint.com. Speak to your account manager on how to get access or drop an email at support@limepoint.com
+
+---
 
 ## Java Version Support
 The consumer is supported with the following Java versions:
 
 1. OpenJDK 17
+
+---
 
 ## Anatomy Of The Consumer
 The consumer artefact consists for three important files which are all required for it to function properly, viz.
@@ -151,7 +176,8 @@ logging: # Optional. # The consumer by default uses the log level of INFO. You c
 solifi:
   prefix: # Client prefix for Solifi brokers. e.g. uat.myabc.ILS.canonical. You would get this information from Solifi.
   suffix: _v2 # Optional. if specified, consumer will remove the `_v2` from the name of the topic and create the table without it. e.g. if the topic name is addl_lessor_nf_v2, the table will be created as addl_lessor_nf
-  topics: # List of topics client wishes to consume from Solifi brokers. Note that the topic names must not have any prefix. The format is <topic_name>:<table_name>:<audit_table_name>. Everything except <topic_name> is optional.
+  topics-regex: # Optional. If specfied, consumer constructs the list of topics to listen to based on the regex. Defaults to '.*' which means it will read all topics that begin with the value specified via the 'prefix' property. If topics-regex and topics are both specified, topics takes precedence. If none are specified, topics-regex takes precedence. E.g. to read only topics starting with addl, use 'addl.*'. This property supports any regex pattern supported by Java.
+  topics: # Optional. List of topics client wishes to consume from Solifi brokers. Note that the topic names must not have any prefix. The format is <topic_name>:<table_name>:<audit_table_name>. Everything except <topic_name> is optional.
     - addl_lessor_nf
     - cs_master_nf
     - address_nf
@@ -169,6 +195,108 @@ server: # Optional. Specifies the port the consumer should expose for monitoring
   port: 8080
 ```
 
+### Sample Application.yml To Read All Topics
+
+Here's a sample `application.yml` file reading all topics that begin with `uat.client.ILS.canonical` (prefix) from a cluster and stores them in a MS SQL database.
+
+```yml
+solifi:
+  prefix: uat.client.ILS.canonical
+  audit:
+    enabled: true
+  license:
+    path: /license.license
+    signature:
+      path: /sign256.sign
+spring:
+  kafka:
+    consumer:
+      group-id: clientname-dev
+    bootstrap-servers: bootstrap-server-hostname:9092
+    properties:
+      schema:
+        registry:
+          url: https://registry-server-hostname
+          basic.auth.user.info: REGISTRY_USERNAME:REGISTRY_PASSWORD
+      security.protocol: SASL_SSL
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule   required username='BROKER_USERNAME'   password='BROKER_PASSWORD';
+  datasource:
+    url: jdbc:sqlserver://mssqldb-ac-uat-sink:1433;database=master;encrypt=true;trustServerCertificate=true;
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    username: admin
+    password: password
+```
+
+### Sample Application.yml To Read Topics Matching A Pattern
+
+Here's a sample `application.yml` file reading all topics that begin with `uat.client.ILS.canonical` (prefix) and start with `cs_` (topics-regex) from a cluster and stores them in a MS SQL database.
+
+```yml
+solifi:
+  prefix: uat.client.ILS.canonical
+  topics-regex: cs_.*
+  audit:
+    enabled: true
+  license:
+    path: /license.license
+    signature:
+      path: /sign256.sign
+spring:
+  kafka:
+    consumer:
+      group-id: clientname-dev
+    bootstrap-servers: bootstrap-server-hostname:9092
+    properties:
+      schema:
+        registry:
+          url: https://registry-server-hostname
+          basic.auth.user.info: REGISTRY_USERNAME:REGISTRY_PASSWORD
+      security.protocol: SASL_SSL
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule   required username='BROKER_USERNAME'   password='BROKER_PASSWORD';
+  datasource:
+    url: jdbc:sqlserver://mssqldb-ac-uat-sink:1433;database=master;encrypt=true;trustServerCertificate=true;
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    username: admin
+    password: password
+```
+
+### Sample Application.yml To Read Explicitly Defined Topics
+
+Here's a sample `application.yml` file reading a set number of topics from a cluster and stores them in a MS SQL database.
+
+```yml
+solifi:
+  prefix: uat.client.ILS.canonical
+  topics:
+    - cs_master_nf
+    - as_addl_nf
+  audit:
+    enabled: true
+  license:
+    path: /license.license
+    signature:
+      path: /sign256.sign
+spring:
+  kafka:
+    consumer:
+      group-id: clientname-dev
+    bootstrap-servers: bootstrap-server-hostname:9092
+    properties:
+      schema:
+        registry:
+          url: https://registry-server-hostname
+          basic.auth.user.info: REGISTRY_USERNAME:REGISTRY_PASSWORD
+      security.protocol: SASL_SSL
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule   required username='BROKER_USERNAME'   password='BROKER_PASSWORD';
+  datasource:
+    url: jdbc:sqlserver://mssqldb-ac-uat-sink:1433;database=master;encrypt=true;trustServerCertificate=true;
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    username: admin
+    password: password
+```
+
+---
+
 ## Health & Monitoring
 
 The consumer exposes a bunch of endpoints for health check and statistics, some of the key endpoints are as below:
@@ -183,6 +311,7 @@ The consumer exposes a bunch of endpoints for health check and statistics, some 
 
 The URIs can be accessed depending on the hosted platform, e.g. when hosting on docker and exposing port 8080, the above endpoints can be accessed via http://localhost:8080/actuator.
 
+---
 
 ## Deployment Methods
 
@@ -255,6 +384,8 @@ Start-up the docker container using,
 ````
 docker compose up -d
 ````
+
+---
 
 ### Deploying on Azure Kubernetes (AKS)
 
@@ -338,6 +469,8 @@ TBD
 
 ### Deploying on K8s
 TBD
+
+---
 
 ## Advanced Deployment Methods
 
@@ -424,8 +557,13 @@ Run,
 You need to update the application.yml file according to the environment. 
 Additionally, if it is a kubernetes deployment and configMaps are used, then configMaps of that namespace should also be updated.
 
+
+---
+
 ## Handling Date & Time
 As recommended above, it is recommended that all date and time be stored in UTC. This solves a lot of problems when dealing with date/time especially in regions with Daylight savings (DST). 
+
+---
 
 ## Scaling Consumer Application
 Scaling is highly dependent on the number of partitions in a kafka topic. As per kafka concepts, consumers could be defined within a consumer group to listen to a topic in parallel. 
@@ -435,6 +573,8 @@ Rather than starting separate consumers individually, Solifi-consumer applicatio
 eg: solifi.concurrency = 5, is equal to having 5 consumers listening to the topics. 
 
 Additionally, if there is are topics with higher TPS, then clients could start up a separate consumer with that particular topic(s) only and set the thread count(solifi.concurrency config) to the number of partitions of the topic. 
+
+---
 
 ## Error Handling
 The consumer application captures any data related errors (e.g. invalid data) and loads them in the **error_log** table. This table gets created and managed by the Consumer during startup. Customers should keep track of the this table to lookup failed messages. The messages in this table are not cleaned up by the Consumer and it is expected that the clients cleanup as they see fit.
@@ -458,7 +598,7 @@ _Main Table: ls_master_
 
 _Audit Table: ls_master_audit_
 
-| id | contract_number | partition | offset | action | kafka_date | inserted_user | insert_date|
+| id | contract_number | lp_kafka_partition | lp_kafka_offset | lp_db_action | lp_kafka_date | lp_db_insert_user | lp_db_insert_date|
 |----|-----------------|--------------|-----------|--------|--------|------------|---------------|
 | 1  | ABC             |  0 | 13  | UPSERT | 2023-11-13 03:35:02.275 | solifi-consumer | 2024-09-11 04:15:04.175 |
 
@@ -477,7 +617,7 @@ _Main Table: ls_master_
 
 _Audit Table: ls_master_audit_
 
-| id | contract_number | partition | offset | action | kafka_date | inserted_user | insert_date|
+| id | contract_number | lp_kafka_partition | lp_kafka_offset | lp_db_action | lp_kafka_date | lp_db_insert_user | lp_db_insert_date|
 |----|-----------------|--------------|-----------|--------|--------|------------|---------------|
 | 1  | ABC             |  0 | 13  | UPSERT | 2023-11-13 03:35:02.275 | solifi-consumer | 2024-09-11 04:15:04.175 |
 | 1  |                 |  0 | 13  | DELETE | 2023-11-13 03:35:02.275 | solifi-consumer | 2024-09-11 04:15:04.175 |
