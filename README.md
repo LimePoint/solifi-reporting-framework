@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
+    * [Release 2.0.4](#release-204)
     * [Release 2.0.3](#release-203)
     * [Release 2.0.2](#release-202)
     * [Release 2.0.1](#release-201)
@@ -18,6 +19,7 @@
     * [Sample Application.yml To Read All Topics](#sample-applicationyml-to-read-all-topics)
     * [Sample Application.yml To Read Topics Matching A Pattern](#sample-applicationyml-to-read-topics-matching-a-pattern)
     * [Sample Application.yml To Read Explicitly Defined Topics](#sample-applicationyml-to-read-explicitly-defined-topics)
+    * [Sample Application.yml To Store Tables Under Custom Schema in MSSQL](#sample-applicationyml-to-store-tables-under-custom-schema-in-mssql)
   * [Deployment Methods](#deployment-methods)
     * [Deploying Standalone](#deploying-standalone)
     * [Deploying As Docker Container](#deploying-as-docker-container)
@@ -40,6 +42,11 @@
 <!-- TOC -->
 
 ## Change Log
+
+### Release 2.0.4
+
+Enhancements
+- Added support for overriding the default schema used when creating tables in a MSSQL server. The property `solifi.default-db-schema-name` defaults to `dbo` when not specified. Refer [Sample Application.yml To Store Tables Under Custom Schema in MSSQL](#sample-applicationyml-to-store-tables-under-custom-schema-in-mssql)
 
 ### Release 2.0.3
 
@@ -186,6 +193,7 @@ solifi:
     include-all: true # default true. If enabled is set to true, consumer will create audit tables for all topics listed under topics heading.
     audit-suffix: _audit # the suffix value to be used when creating audit tables, e.g. this will create a audit table named addl_lessor_nf_audit.
   concurrency: 5 # Optional. This dicates number of listener threads per consumer. It defaults to the server it is running on (usually 8 or 10). For better performance this should be equal to the topic partition count but most of the customers use the default value.
+  default-db-schema-name: # Optional, only used when the backend db is MSSQL. Defaults to dbo if not specified.
   license:
     path: # Path of the license file provided by LimePoint.
     signature:
@@ -294,6 +302,40 @@ spring:
     username: admin
     password: password
 ```
+
+### Sample Application.yml To Store Tables Under Custom Schema in MSSQL
+
+Here's a sample `application.yml` file reading all topics that begin with `uat.client.ILS.canonical` (prefix) from a cluster and stores them in a MS SQL database under a non-default (dbo) schema. In the example below, all tables are created under `ils`. This assumes that you have created the custom database, the relevant users and schemas upfront. Notice the use of property `default-db-schema-name`.
+
+```yml
+solifi:
+  prefix: uat.client.ILS.canonical
+  default-db-schema-name: ils
+  audit:
+    enabled: true
+  license:
+    path: /license.license
+    signature:
+      path: /sign256.sign
+spring:
+  kafka:
+    consumer:
+      group-id: clientname-dev
+    bootstrap-servers: bootstrap-server-hostname:9092
+    properties:
+      schema:
+        registry:
+          url: https://registry-server-hostname
+          basic.auth.user.info: REGISTRY_USERNAME:REGISTRY_PASSWORD
+      security.protocol: SASL_SSL
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule   required username='BROKER_USERNAME'   password='BROKER_PASSWORD';
+  datasource:
+    url: jdbc:sqlserver://mssqldb-ac-uat-sink:1433;database=ils;encrypt=true;trustServerCertificate=true;
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    username: admin
+    password: password
+```
+
 
 ---
 
