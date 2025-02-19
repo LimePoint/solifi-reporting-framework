@@ -20,6 +20,7 @@
     * [Sample Application.yml To Read Topics Matching A Pattern](#sample-applicationyml-to-read-topics-matching-a-pattern)
     * [Sample Application.yml To Read Explicitly Defined Topics](#sample-applicationyml-to-read-explicitly-defined-topics)
     * [Sample Application.yml To Store Tables Under Custom Schema in MSSQL](#sample-applicationyml-to-store-tables-under-custom-schema-in-mssql)
+    * [Sample Application.yml To Use Regex To Map Topics to Table Names](#sample-applicationyml-to-use-regex-to-map-topics-to-table-names)
   * [Deployment Methods](#deployment-methods)
     * [Deploying Standalone](#deploying-standalone)
     * [Deploying As Docker Container](#deploying-as-docker-container)
@@ -42,6 +43,12 @@
 <!-- TOC -->
 
 ## Change Log
+
+### Release 2.0.5
+
+Enhancements
+- Added support for using Regex to manage table to topic mappings. This enables clients to remove the prefixes in topic names via the property `solifi.topic-table-mapping` enables that. Refer [Sample Application.yml To Use Regex To Map Topics to Table Names](#sample-applicationyml-to-use-regex-to-map-topics-to-table-names)
+
 
 ### Release 2.0.4
 
@@ -181,9 +188,12 @@ logging: # Optional. # The consumer by default uses the log level of INFO. You c
     com.limepoint.solifi: DEBUG
 
 solifi:
-  prefix: # Client prefix for Solifi brokers. e.g. uat.myabc.ILS.canonical. You would get this information from Solifi.
+  prefix: # Required. Client prefix for Solifi brokers. e.g. uat.myabc.ILS.canonical. You would get this information from Solifi.
   suffix: _v2 # Optional. if specified, consumer will remove the `_v2` from the name of the topic and create the table without it. e.g. if the topic name is addl_lessor_nf_v2, the table will be created as addl_lessor_nf
   topics-regex: # Optional. If specfied, consumer constructs the list of topics to listen to based on the regex. Defaults to '.*' which means it will read all topics that begin with the value specified via the 'prefix' property. If topics-regex and topics are both specified, topics takes precedence. If none are specified, topics-regex takes precedence. E.g. to read only topics starting with addl, use 'addl.*'. This property supports any regex pattern supported by Java.
+  topic-table-mapping: # Optional. If specified, matches the names of the topics with the match property and replaces it with the replace property. E.g. if you have topics uat.client.FMO.canonical.calms-app_asset_other_charge and want the table name to be app_asset_other_charge as opposed to calms-app_asset_other_charge, you can use the following:
+    - match: "uat.client.FMO.canonical.*-"
+      replace: ""
   topics: # Optional. List of topics client wishes to consume from Solifi brokers. Note that the topic names must not have any prefix. The format is <topic_name>:<table_name>:<audit_table_name>. Everything except <topic_name> is optional.
     - addl_lessor_nf
     - cs_master_nf
@@ -336,6 +346,40 @@ spring:
     password: password
 ```
 
+### Sample Application.yml To Use Regex To Map Topics to Table Names
+
+Here's a sample `application.yml` file reading all topics that begin with `uat.client.FMO.canonical` (prefix) from a cluster and stores them in a MS SQL database. In the example below, the tables created in the database are different to the name of the topics that match the criterion. E.g. The name of the topics under FMO can be `uat.client.FMO.canonical.calms-app_quote` or `uat.client.FMO.canonical.catalog-catalog_model` which by default would result in the name of the table as `calms-app_quote` and `catalog-catalog_model`. If you do not want the table names to have the prefix of `calms-` or `catalog-`, you can use the property `topic-table-mapping` to define those rules. The property `topic-table-mapping` is only used for mapping topic names to table names. It does not direct the consumer or control how many topics are fetched from the broker. The `match` property takes any valid Java regex. The `replace` property can be any valid string. The `match` property matches the topic names and will replace it with the property `replace`.
+
+```yml
+solifi:
+  prefix: uat.client.FMO.canonical
+  topic-table-mapping:
+    - match: "uat.client.FMO.canonical.*-"
+      replace: ""
+  audit:
+    enabled: true
+  license:
+    path: /license.license
+    signature:
+      path: /sign256.sign
+spring:
+  kafka:
+    consumer:
+      group-id: clientname-dev
+    bootstrap-servers: bootstrap-server-hostname:9092
+    properties:
+      schema:
+        registry:
+          url: https://registry-server-hostname
+          basic.auth.user.info: REGISTRY_USERNAME:REGISTRY_PASSWORD
+      security.protocol: SASL_SSL
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule   required username='BROKER_USERNAME'   password='BROKER_PASSWORD';
+  datasource:
+    url: jdbc:sqlserver://mssqldb-ac-uat-sink:1433;database=ils;encrypt=true;trustServerCertificate=true;
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    username: admin
+    password: password
+```
 
 ---
 
