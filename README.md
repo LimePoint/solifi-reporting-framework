@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
   * [Change Log](#change-log)
+    * [Release 2.0.5](#release-205)
     * [Release 2.0.4](#release-204)
     * [Release 2.0.3](#release-203)
     * [Release 2.0.2](#release-202)
