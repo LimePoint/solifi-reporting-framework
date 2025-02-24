@@ -1,15 +1,17 @@
-# Solifi Realtime Reporting Kafka Consumer
+# LimePoint Solifi Consumer
 
 
 <!-- TOC -->
-* [Solifi Realtime Reporting Kafka Consumer](#solifi-realtime-reporting-kafka-consumer)
+* [LimePoint Solifi Consumer](#limePoint-solifi-consumer)
   * [Change Log](#change-log)
+    * [Release 2.0.6](#release-206)
     * [Release 2.0.5](#release-205)
     * [Release 2.0.4](#release-204)
     * [Release 2.0.3](#release-203)
     * [Release 2.0.2](#release-202)
     * [Release 2.0.1](#release-201)
   * [Overview](#overview)
+  * [Network Diagram](#network-diagram)
   * [Supported Deployment Methods](#supported-deployment-methods)
   * [Supported Backend Databases](#supported-backend-databases)
   * [Access To LimePoint Support](#access-to-limepoint-support)
@@ -18,10 +20,12 @@
     * [The Consumer Application](#the-consumer-application)
     * [Understanding Application.yml File](#understanding-applicationyml-file)
     * [Sample Application.yml To Read All Topics](#sample-applicationyml-to-read-all-topics)
+    * [Sample Application.yml Using Environment Variables](#sample-applicationyml-using-environment-variables)
     * [Sample Application.yml To Read Topics Matching A Pattern](#sample-applicationyml-to-read-topics-matching-a-pattern)
     * [Sample Application.yml To Read Explicitly Defined Topics](#sample-applicationyml-to-read-explicitly-defined-topics)
     * [Sample Application.yml To Store Tables Under Custom Schema in MSSQL](#sample-applicationyml-to-store-tables-under-custom-schema-in-mssql)
     * [Sample Application.yml To Use Regex To Map Topics to Table Names](#sample-applicationyml-to-use-regex-to-map-topics-to-table-names)
+  * [Health Monitoring](#health-monitoring)
   * [Deployment Methods](#deployment-methods)
     * [Deploying Standalone](#deploying-standalone)
     * [Deploying As Docker Container](#deploying-as-docker-container)
@@ -44,6 +48,12 @@
 <!-- TOC -->
 
 ## Change Log
+
+### Release 2.0.6
+
+Enhancements
+- Added support monitoring via Prometheus endpoint. The consumer now exposes a `/actuator/prometheus` endpoint to hook into any external Prometheus system. Refer [Health Monitoring](#health-monitoring)
+
 
 ### Release 2.0.5
 
@@ -76,7 +86,7 @@ When running the consumer for the first time, you might see errors in the logs r
 
 ## Overview
 
-Solifi Realtime Reporting application is a Kafka Consumer that allows customers to read messages from Solifi brokers and persist it in the database of choice. The consumer is generic and can be used by any customer using Solifi services and allows modifications via configuration files.
+LimePoint Solifi Consumer is a Kafka Consumer that allows customers to read messages from Solifi brokers and persist it in the database of choice. The consumer is generic and can be used by any customer using Solifi services and allows modifications via configuration files.
 
 The consumer provides the following functionalities:
 
@@ -136,7 +146,7 @@ The consumer artefact consists for three important files which are all required 
 The consumer application includes built-in functionality to manage backend database schemas. It automatically creates a table for each topic and, if needed, an accompanying audit table. The tables are adjusted based on the messages received. However, the consumer only creates or modifies tables for the topics specified in the application.yml file. For example, while the ILS application may have over 600 topics, if only 10 topics are listed in your application.yml file, the consumer will create tables for just those 10 topics.
 
 ### Understanding Application.yml File
-The behavior of the consumer is configured through the application.yml file. This file instructs the consumer on which brokers to read data from, which backend database to persist the data to, how many threads to run, and more. You can remove any configurations that are not relevant to your use case from the application.yaml. The sample below demonstrates all the currently supported configuration options. Any field marked as optional can be left out.
+The behavior of the consumer is configured through the application.yml file. This file instructs the consumer on which brokers to read data from, which backend database to persist the data to, how many threads to run, and more. You can remove any configurations that are not relevant to your use case from the application.yaml. The sample below demonstrates all the currently supported configuration options. Any field marked as optional can be left out. You can also replace the value of any field with an environment variable.
 
 ```yml
 spring:
@@ -245,6 +255,40 @@ spring:
     username: admin
     password: password
 ```
+
+### Sample Application.yml Using Environment Variables
+
+Here's a sample `application.yml` file reading all topics that begin with `uat.client.ILS.canonical` (prefix) from a cluster and stores them in a MS SQL database but instead of hard coding the values of credentials, uses environment variables instead. You can use whatever name you want for the environment variable.
+
+```yml
+solifi:
+  prefix: uat.client.ILS.canonical
+  audit:
+    enabled: true
+  license:
+    path: /license.license
+    signature:
+      path: /sign256.sign
+spring:
+  kafka:
+    consumer:
+      group-id: clientname-dev
+    bootstrap-servers: ${SOLIFI_BOOTSTRAP_SERVERS} # e.g. bootstrap-server-hostname:9092
+    properties:
+      schema:
+        registry:
+          url: https://registry-server-hostname
+          basic.auth.user.info: ${SOLIFI_REGISTRY_USERNAME}:${${SOLIFI_REGISTRY_PASSWORD}} # e.g. REGISTRY_USERNAME:REGISTRY_PASSWORD
+      security.protocol: SASL_SSL
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username=${SOLIFI_BROKER_USERNAME}   password=$SOLIFI_BROKER_PASSWORD};
+  datasource:
+    url: jdbc:sqlserver://mssqldb-ac-uat-sink:1433;database=master;encrypt=true;trustServerCertificate=true;
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    username: ${SOLIFI_DATABASE_USERNAME}
+    password: ${SOLIFI_DATABASE_PASSWORD}
+```
+
+You **must** export the variables before you start the consumer else they will default to empty values. You can export them on the command line or if using docker in the `compose.yml` file or in K8s environment variables.
 
 ### Sample Application.yml To Read Topics Matching A Pattern
 
@@ -384,7 +428,7 @@ spring:
 
 ---
 
-## Health & Monitoring
+## Health Monitoring
 
 The consumer exposes a bunch of endpoints for health check and statistics, some of the key endpoints are as below:
 
@@ -394,9 +438,18 @@ The consumer exposes a bunch of endpoints for health check and statistics, some 
 | /actuator/health         | Shows/returns the health of the consumer |
 | /actuator/metrics/<metric_name> | Shows/returns the value of the specified metric. You can hit /actuator/metrics to see the list of metrics available. |
 | /actuator                | Shows all endpoints available. |
+| /actuator/prometheus     | Exposes a Prometheus endpoint. |
 |     
 
 The URIs can be accessed depending on the hosted platform, e.g. when hosting on docker and exposing port 8080, the above endpoints can be accessed via http://localhost:8080/actuator.
+
+You can create Grafana dashboards using samples provided at [LimePoint Solifi Consumer Examples](https://github.com/LimePoint/limepoint-solifi-consumer-examples)
+
+The dashboards provide insights into jvm metrics along with consumer metrics and you can customize as per requirements.
+
+![JVM Metrics](imgs/jvm1.png)
+
+![Consumer Metrics](imgs/consumer_metrics.png)
 
 ---
 
