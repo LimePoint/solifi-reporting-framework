@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [LimePoint Solifi Consumer](#limePoint-solifi-consumer)
   * [Change Log](#change-log)
+    * [Release 2.0.7](#release-207)
     * [Release 2.0.6](#release-206)
     * [Release 2.0.5](#release-205)
     * [Release 2.0.4](#release-204)
@@ -48,6 +49,11 @@
 <!-- TOC -->
 
 ## Change Log
+
+### Release 2.0.7
+
+Bug Fixes
+- Fixed an issue with date columns not being recognized correctly if the schema has `long` type marked against the column. This only happens for clients who have not yet migrated to the `v2` version of the topics. Customer might notice `Updating Optional DATE schema from 'long' to 'int' for <column_name>` messages in their logs which can be ignored. This message is purposely set to `info` level to indicate that the table has invalid schema. 
 
 ### Release 2.0.6
 
