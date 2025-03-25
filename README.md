@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [LimePoint Solifi Consumer](#limePoint-solifi-consumer)
   * [Change Log](#change-log)
+    * [Release 2.0.8](#release-208)
     * [Release 2.0.7](#release-207)
     * [Release 2.0.6](#release-206)
     * [Release 2.0.5](#release-205)
@@ -25,6 +26,7 @@
     * [Sample Application.yml To Read Topics Matching A Pattern](#sample-applicationyml-to-read-topics-matching-a-pattern)
     * [Sample Application.yml To Read Explicitly Defined Topics](#sample-applicationyml-to-read-explicitly-defined-topics)
     * [Sample Application.yml To Store Tables Under Custom Schema in MSSQL](#sample-applicationyml-to-store-tables-under-custom-schema-in-mssql)
+    * [Sample Application.yml To Store Data Using Unicode in MSSQL](#sample-applicationyml-to-store-data-using-unicode-in-mssql)
     * [Sample Application.yml To Use Regex To Map Topics to Table Names](#sample-applicationyml-to-use-regex-to-map-topics-to-table-names)
   * [Health Monitoring](#health-monitoring)
   * [Deployment Methods](#deployment-methods)
@@ -46,9 +48,17 @@
   * [Auditing](#auditing)
     * [How Auditing Works](#how-auditing-works)
     * [Important Considerations When Enabling Auditing](#important-considerations-when-enabling-auditing)
+  * [Data Refresh](#data-refresh)
 <!-- TOC -->
 
 ## Change Log
+
+### Release 2.0.8
+
+Enhancements
+- Added support for unicode characters. By default the consumer will store data without unicode. To enable unicode characters, you must set `support-unicode: true` in application.yml. Please note that enabling unicode reduces the size of the columns the consumer creates. Refer [Sample Application.yml To Store Data Using Unicde in MSSQL](#sample-applicationyml-to-store-data-using-unicode-in-mssql)
+- Updated the auditing function to add the `consumer group id` in the audit tables. This enables customers to keep the history of audit logs during data refreshes. See [How Auditing Works](#how-auditing-works) for more details.
+- Added logging for `delete` events. The consumer now logs a `Received 'Delete' ConsumerRecord` message when it finds a record to be deleted.
 
 ### Release 2.0.7
 
@@ -215,8 +225,9 @@ solifi:
     - addl_lessor_nf
     - cs_master_nf
     - address_nf
+  support-unicode: # Optional. Defaults to false. If set to to true, consumer will create all columns with unicode support (nvarchar). Setting this to true will reduce the size of the columns as unicode occupies twice the space as non unicode.
   audit: # Optional.
-    enabled: true # Optional. defaults to false. Setting it to true will create audit tables. See what audit tables do later in the document.
+    enabled: true # Optional. Defaults to false. Setting it to true will create audit tables. See what audit tables do later in the document.
     include-all: true # default true. If enabled is set to true, consumer will create audit tables for all topics listed under topics heading.
     audit-suffix: _audit # the suffix value to be used when creating audit tables, e.g. this will create a audit table named addl_lessor_nf_audit.
   concurrency: 5 # Optional. This dicates number of listener threads per consumer. It defaults to the server it is running on (usually 8 or 10). For better performance this should be equal to the topic partition count but most of the customers use the default value.
@@ -372,6 +383,40 @@ Here's a sample `application.yml` file reading all topics that begin with `uat.c
 solifi:
   prefix: uat.client.ILS.canonical
   default-db-schema-name: ils
+  audit:
+    enabled: true
+  license:
+    path: /license.license
+    signature:
+      path: /sign256.sign
+spring:
+  kafka:
+    consumer:
+      group-id: clientname-dev
+    bootstrap-servers: bootstrap-server-hostname:9092
+    properties:
+      schema:
+        registry:
+          url: https://registry-server-hostname
+          basic.auth.user.info: REGISTRY_USERNAME:REGISTRY_PASSWORD
+      security.protocol: SASL_SSL
+      sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule   required username='BROKER_USERNAME'   password='BROKER_PASSWORD';
+  datasource:
+    url: jdbc:sqlserver://mssqldb-ac-uat-sink:1433;database=ils;encrypt=true;trustServerCertificate=true;
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    username: admin
+    password: password
+```
+
+### Sample Application.yml To Store Data Using Unicode in MSSQL
+
+Here's a sample `application.yml` file reading all topics that begin with `uat.client.ILS.canonical` (prefix) from a cluster and stores them in a MS SQL database under a non-default (dbo) schema. In the example below, all tables are created under `ils`. This assumes that you have created the custom database, the relevant users and schemas upfront. Notice the use of property `default-db-schema-name`. This stores all the columns with unicode support, notice the property `support-unicode`.
+
+```yml
+solifi:
+  prefix: uat.client.ILS.canonical
+  default-db-schema-name: ils
+  support-unicode: true
   audit:
     enabled: true
   license:
@@ -732,7 +777,7 @@ Auditing can be enabled by specifying the topic names as a list in 'solifi.audit
 
 **Scenario 1: Any insert or update event**
 
-A similar record will be inserted into the audit table with partition, offset, action, kafka_date, inserted_user, insert_date columns in addition to the original columns of the table.
+A similar record will be inserted into the audit table with partition, offset, action, kafka_date, inserted_user, insert_date columns in addition to the original columns of the table. The value of `lp_db_insert_user` will default to the `group-id` specified in the application.yml.
 
 Eg: Insert or update record
 
@@ -774,3 +819,11 @@ _Audit Table: ls_master_audit_
 * Data in audit tables aren't cleaned up. It needs to be handled manually according to data retention policies of your organization.
 * Since auditing stores a copy of the data, additional storage is required. So you must plan the storage accordingly. Usually, if you enable auditing for all tables, you need approximately more than twice the storage.
 * Any configuration changes do not come into effect without a restart of the consumer.
+
+## Data Refresh
+
+There may be cases when data in the consumer database needs to be refreshed. This typically involves deleting the consumer database or deleting all the tables and audit tables in the database; changing the value of `group-id` in the `application.yml` file and restarting the consumer.
+
+Solifi compresses the data after 7 days, so it is common to loose audit history of data during data refresh. If you would like to keep the audit history, it is recommended that you do not delete the `_audit` tables during the refresh.
+The consumer will appened in the audit events in the existing table. You might see some duplicate records but the value in column `lp_db_insert_user` would be different.
+
