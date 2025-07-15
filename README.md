@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [LimePoint Solifi Consumer](#limePoint-solifi-consumer)
   * [Change Log](#change-log)
+    * [Release 2.1.0](#release-210)
     * [Release 2.0.8](#release-208)
     * [Release 2.0.7](#release-207)
     * [Release 2.0.6](#release-206)
@@ -52,6 +53,15 @@
 <!-- TOC -->
 
 ## Change Log
+
+### Release 2.1.0
+
+Enhancements
+- Platform upgrades including container images, jdk, database drivers and springboot.
+- Improved error logging with better messaging for database, network or business exceptions.
+- Added `insert_date` to the audit logging tables.
+- Updated MSSQL driver support to not hold locks when using merge.
+
 
 ### Release 2.0.8
 
