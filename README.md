@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [LimePoint Solifi Consumer](#limePoint-solifi-consumer)
   * [Change Log](#change-log)
+    * [Release 2.1.1](#release-211)
     * [Release 2.1.0](#release-210)
     * [Release 2.0.8](#release-208)
     * [Release 2.0.7](#release-207)
@@ -53,6 +54,14 @@
 <!-- TOC -->
 
 ## Change Log
+
+### Release 2.1.1
+
+Enhancements
+- Updated the datetime precision for the `lp_db_insert_date` column for all audit tables to be precision 6, this helps with issues with MS SQL mirrorring. Note that this is only applicable for new audit tables being created and does not change any existing tables.
+- Improved logging, consumer now appends `partition:offset` in front of every message.
+- Added `msal4j:1.22.0` to help authenticate with MS Azure Identity. 
+
 
 ### Release 2.1.0
 
