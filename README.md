@@ -31,6 +31,7 @@
     * [Sample Application.yml To Store Data Using Unicode in MSSQL](#sample-applicationyml-to-store-data-using-unicode-in-mssql)
     * [Sample Application.yml To Use Regex To Map Topics to Table Names](#sample-applicationyml-to-use-regex-to-map-topics-to-table-names)
   * [Health Monitoring](#health-monitoring)
+  * [Sizing Guide](#sizing-guide)
   * [Deployment Methods](#deployment-methods)
     * [Deploying Standalone](#deploying-standalone)
     * [Deploying As Docker Container](#deploying-as-docker-container)
@@ -520,6 +521,28 @@ The dashboards provide insights into jvm metrics along with consumer metrics and
 ![JVM Metrics](imgs/jvm1.png)
 
 ![Consumer Metrics](imgs/consumer_metrics.png)
+
+---
+
+## Sizing Guide
+
+The consumer service is lightweight and does not require significant system resources under steady-state conditions.
+
+### Consumer Resource Requirements
+
+**Normal operation**:
+When the consumer is processing messages in real time and not significantly behind the upstream broker, allocate a minimum of 2 vCPUs and 2 GB of memory. This configuration is sufficient for ongoing consumption workloads.
+
+**Initial load or backlog processing**:
+When the consumer is required to process a large backlog (for example, over 20 million messages), additional resources are recommended to ensure efficient catch-up. In these scenarios, allocate up to 16 vCPUs and 32 GB of memory. This allows multiple consumers to run in parallel.
+
+Once the backlog has been processed and the consumer has caught up to the upstream, resources can be reduced to the normal operating configuration.
+
+### Database Bottleneck
+
+While the consumer can be scaled horizontally to process messages in parallel, the database is typically the largest bottleneck in the ingestion pipeline. The database must persist all consumed records, and its performance is limited by factors such as transaction management, indexing, checkpointing, and disk I/O.
+
+Adding more consumers beyond a certain point does not improve throughput and may instead reduce efficiency. The maximum sustainable throughput is therefore determined by the database’s ability to perform inserts in parallel, not necessarily by the number of consumers.
 
 ---
 
