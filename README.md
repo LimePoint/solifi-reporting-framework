@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [LimePoint Solifi Consumer](#limePoint-solifi-consumer)
   * [Change Log](#change-log)
+    * [Release 2.2.0](#release-220)
     * [Release 2.1.1](#release-211)
     * [Release 2.1.0](#release-210)
     * [Release 2.0.8](#release-208)
@@ -52,9 +53,28 @@
     * [How Auditing Works](#how-auditing-works)
     * [Important Considerations When Enabling Auditing](#important-considerations-when-enabling-auditing)
   * [Data Refresh](#data-refresh)
+  * [Initial Load Mode](#initial-load-mode)
+    * [Understanding Initial Load Mode](#understanding-initial-load-mode)
+    * [Running the Consumer in Initial Load Mode](#running-the-consumer-in-initial-load-mode)
+    * [Step 1: Perform a Dry Run](#step-1-perform-a-dry-run)
+    * [Step 2: Execute the Initial Load](#step-2-execute-the-initial-load)
+    * [Step 3: Monitor Load Progress](#step-3-monitor-load-progress)
+    * [Step 4: Switch Back to Streaming Mode](#step-4-switch-back-to-streaming-mode)
+    * [Recovering from Failed Loads](#recovering-from-failed-loads)
+    * [Refreshing the Initial Load](#refreshing-the-initial-load)
+    * [Infrastructure Recommendations](#infrastructure-recommendations)
+
+
 <!-- TOC -->
 
 ## Change Log
+
+### Release 2.2.0
+
+Enhancements
+- This release introduces a new consumer mode called `initial_load`. The consumer now supports two modes: `streaming` and `initial_load`. By default, the consumer runs in `streaming` mode, maintaining the same behavior as in previous versions. In `initial_load` mode, however, the consumer operates differently. This mode is recommended for customers handling large data loads from Solifi upstream systems (typically over 10 million messages), though it can also be used for smaller datasets. For details on how to use this feature, see [Initial Load Mode](#initial-load-mode)
+- Updated error handling to clean up messages left behind in the MDC via other threads.
+
 
 ### Release 2.1.1
 
@@ -868,4 +888,238 @@ There may be cases when data in the consumer database needs to be refreshed. Thi
 
 Solifi compresses the data after 7 days, so it is common to loose audit history of data during data refresh. If you would like to keep the audit history, it is recommended that you do not delete the `_audit` tables during the refresh.
 The consumer will appened in the audit events in the existing table. You might see some duplicate records but the value in column `lp_db_insert_user` would be different.
+
+## Initial Load Mode
+
+Starting with release 2.2.0, the consumer can operate in a special mode called `initial_load`. The consumer supports two modes:
+
+- `streaming` (default) – standard behavior consistent with previous versions.
+- `initial_load` – optimized for high-volume data ingestion.
+
+The `initial_load` mode is recommended for customers handling large datasets from Solifi upstream systems (typically more than 5 million messages). It can also be used for smaller data volumes when faster ingestion is desired.
+
+**Important**: The consumer cannot run permanently in `initial_load` mode. Once data has been loaded, you must switch the consumer back to `streaming` mode.
+
+The `initial_load` mode provides a high-performance, insert-only mechanism for efficiently bootstrapping large datasets into the consumer’s backend database. Once the initial ingestion completes, returning to `streaming` mode ensures ongoing, incremental synchronization with upstream data sources.
+
+### Understanding Initial Load Mode
+
+When running in `streaming` mode, the consumer follows an `update-if-present` principle — inserting a new record if it doesn’t exist or updating it if it does. While this ensures data consistency, it can significantly slow down message processing when dealing with very large datasets.
+
+For example:
+- You have 140 topics with a combined 100 million messages.
+- Running a single consumer instance in streaming mode might take 10–12 days to process all messages.
+- Running multiple instances (e.g., 10 consumers) can create database locking contention, further reducing efficiency.
+
+In contrast, the `initial_load` mode operates on an `insert-only` principle, processing one topic partition at a time. It bypasses update locks, allowing for significantly faster ingestion. Once all messages are processed, the consumer stops automatically and must be restarted in streaming mode to resume normal operation.
+
+### Running the Consumer in Initial Load Mode
+
+Running the consumer in `initial_load` mode involves four steps:
+
+1. Perform a Dry Run
+2. Execute the Initial Load
+3. Monitor Load Progress
+4. Switch Back to Streaming Mode
+
+### Step 1: Perform a Dry Run
+
+Before performing the actual data load, you must start with a clean backend database.
+The dry run phase identifies all topics and partitions and records offset information without consuming any messages.
+
+Add the following configuration under the solifi section in your application.yml:
+```yaml
+solifi:
+  initial-load:  
+    enabled: true     # Enables initial_load mode (default: false)
+    dryrun: true      # Performs discovery only (default: false)
+    batch-size: 20000 # Number of messages to fetch per batch
+    clientId: load-app-1 # Unique identifier for this consumer instance
+  # <other properties>
+```
+
+Start the consumer with `dryrun` set to `true`.
+The process completes within a few seconds and creates a database table named `lp_initial_load`.
+
+This table drives the subsequent loading phase and includes the following columns:
+
+| Column Name          | Description                                               |
+| -------------------- | --------------------------------------------------------- |
+| **topic_name**       | Name of the Kafka topic                                   |
+| **partition_id**     | Partition number of the topic                             |
+| **start_offset**     | Offset from which the consumer starts reading             |
+| **end_offset**       | Offset up to (but not including) which the consumer reads |
+| **status**           | Current processing status of the topic partition          |
+| **total_entries**    | Total number of unique messages identified                |
+| **load_duration_ms** | Time taken to process the partition                       |
+
+
+**Status Lifecycle**
+The **status** column in the table higlights the status of each partition.
+
+| State         | Description                             | Allowed Next States       | Exit Criteria                         |
+| ------------- | --------------------------------------- | ------------------------- | ------------------------------------- |
+| **INITIAL**   | Default state for each topic partition. | **ALLOCATED**             | Reserved by a client (`clientId`).    |
+| **ALLOCATED** | Partition is reserved for processing.   | **LOADED**, **FAILED**    | Starts reading from `start_offset`.   |
+| **LOADED**    | Data read up to `end_offset - 1`.       | **SAVED**, **FAILED**     | Ready to persist last record per key. |
+| **SAVED**     | Records written to the database.        | **COMPLETED**, **FAILED** | Post-save validation succeeds.        |
+| **COMPLETED** | Partition fully processed.              | —                         | Terminal state.                       |
+| **FAILED**    | Processing error occurred.              | —                         | Requires manual admin reset.          |
+
+
+### Step 2: Execute the Initial Load
+
+After completing the dry run, modify your configuration as follows:
+```yaml
+solifi:
+  initial-load:  
+    enabled: true
+    dryrun: false     # Enable actual loading
+    batch-size: 20000
+    clientId: load-app-1
+  # <other properties>
+```
+
+Each `clientId` instance processes one partition per topic at a time. For example, if there are 100 topics with 6 partitions each, a single consumer instance processes all partitions of a topic sequentially. No two instances will process the same topic.
+
+To accelerate the process, you can run multiple consumers in parallel using different `clientId` values but with the same Kafka consumer group ID. 
+
+**Each consumer instance must use the same group-id value to coordinate partition assignment.**
+
+e.g.
+```yaml
+spring:
+  kafka:
+   consumer:
+    group-id: # this value should be same for each consumer client
+```
+
+The consumer stops automatically when all records are processed from the `lp_initial_load` table.
+
+### Step 3: Monitor Load Progress
+
+Depending on the data volume, number of topics, and available resources, the initial load may take several hours.
+
+You can monitor progress using SQL queries against the `lp_initial_load` table.
+
+**View Current Progress**
+```sql
+SELECT * 
+FROM lp_initial_load
+WHERE status NOT IN ('INITIAL')
+ORDER BY last_updated_ts DESC;
+```
+
+**View Load Duration (Melbourne Time)**
+```sql
+SELECT SWITCHOFFSET(MIN(load_started_ts), '+10:00') AS Start,
+       SWITCHOFFSET(MAX(last_updated_ts), '+10:00') AS Last,
+       DATEDIFF(MINUTE, MIN(load_started_ts), MAX(last_updated_ts)) AS Minutes,
+       CONVERT(VARCHAR(5), DATEADD(MINUTE, DATEDIFF(MINUTE, MIN(load_started_ts), MAX(last_updated_ts)), 0), 114) AS Duration
+FROM lp_initial_load;
+```
+
+**View Progress by Consumer client instance**
+```sql
+SELECT status, status_info, COUNT(*) AS Count
+FROM lp_initial_load
+GROUP BY status, status_info
+ORDER BY status, status_info;
+```
+
+### Step 4: Switch Back to Streaming Mode
+
+Once all partitions are processed, verify that every record in `lp_initial_load` has a `COMPLETED` status.
+
+If any partitions remain incomplete, refer to the Recovery section or contact LimePoint Support before proceeding.
+
+To return the consumer to normal operation, remove or disable the initial-load section in `application.yml`:
+```yaml
+solifi:
+  # initial-load:
+  #   enabled: false
+  #   dryrun: false
+  #   batch-size: 20000
+  #   clientId: load-app-1
+```
+
+The consumer will then resume processing from the `end_offset` values recorded in `lp_initial_load` table.
+
+**Note**: If your upstream systems continue to produce messages during the initial load, a small backlog may accumulate. The consumer automatically resumes from the latest offsets upon switching back to streaming mode.
+
+### Recovering from Failed Loads
+
+**Do not attempt recovery while the consumer is running in streaming mode. Doing so may result in inconsistent data.**
+
+Failures during initial load typically occur due to insufficient resources (especially memory), database downtime, or network interruptions. When this happens, the affected partitions are marked as `FAILED` in `lp_initial_load`.
+
+In rare cases, the consumer process may exit prematurely without updating the status. Any record not marked as `COMPLETED` should be treated as incomplete.
+
+You have two recovery options:
+1. Restart the entire process (recommended if many topics failed).
+2. Reload only failed topics (recommended if only a few partitions failed).
+
+**Option 1: Full Restart**
+
+Start with a fresh database (no existing data or audit tables).
+
+Repeat the process beginning from **Step 1: Perform a Dry Run**
+
+**Option 2: Partial Recovery**
+
+1. Identify failed topics and partitions using `lp_initial_load`.
+2. Drop their corresponding data and audit tables.
+3. Reset their statuses to `INITIAL` in `lp_initial_load`.
+
+For example, say out of the 100 topics in the `lp_initial_load` table, 2 failed and their status looks like below. Note that for topic_b, you have to treat the status `ALLOCATED` and `SAVED` as failed **IF and only IF** there consumer instance has exited.
+
+| topic_name | partition | status |
+| --- | --- | --- |
+| topic_a | 0 | FAILED |
+| topic_a | 1 | FAILED |
+| topic_b | 0 | ALLOCATED |
+| topic_b | 1 | SAVED |
+
+To restart the initial load process only for these two topics, drop the table `topic_a` and `topic_b` from the database including the `topic_a_audit` and `topic_b_audit` tables (if auditing is enabled).
+
+```sql
+UPDATE lp_initial_load SET status = 'INITIAL' WHERE topic_name IN ('topic_a', 'topic_b');
+```
+
+Then restart the consumer in `initial_load` mode.
+Once complete, switch back to `streaming` mode as described earlier.
+
+### Refreshing the Initial Load
+
+To completely re-run the process, start with a clean backend database and repeat all steps from `Step 1: Perform a Dry Run`
+
+
+### Infrastructure Recommendations
+
+The performance of the `initial_load` process depends on several factors:
+
+- Volume of data per topic and partition
+- Number of parallel consumer instances
+- Database capacity (CPU, memory, and storage performance)
+
+The consumer is memory-intensive during this phase. Required memory depends on message size and partition volume.
+
+Our internal testing uses this sample workload:
+
+| Parameter                    | Value              |
+| ---------------------------- | ------------------ |
+| Total topics                 | 144                |
+| Average partitions per topic | 6                  |
+| Largest partition            | 1 million messages |
+| Total messages               | 52 million         |
+
+
+**Recommended configurations**:
+- **Consumer instances**: 6 (each with 8 GB memory and 4 CPU)
+- **Database instance**: 8 CPU, 16 GB memory
+- **Network**: Local, no firewalls or packet inspection
+- **Observed duration**: ~4 hours 30 minutes
+
+After switching to `streaming` mode, resource requirements drop substantially.
+Typical configuration: 2 CPU / 2 GB memory per consumer instance.
 
