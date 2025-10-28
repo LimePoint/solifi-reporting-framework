@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [LimePoint Solifi Consumer](#limePoint-solifi-consumer)
   * [Change Log](#change-log)
+    * [Release 2.2.1](#release-221)
     * [Release 2.2.0](#release-220)
     * [Release 2.1.1](#release-211)
     * [Release 2.1.0](#release-210)
@@ -68,6 +69,12 @@
 <!-- TOC -->
 
 ## Change Log
+
+### Release 2.2.1
+
+Bug Fixes
+- Fixed an issue where the consumer ignored the `topic` property when running in `initial_load` mode.
+
 
 ### Release 2.2.0
 
