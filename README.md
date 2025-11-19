@@ -4,6 +4,7 @@
 <!-- TOC -->
 * [LimePoint Solifi Consumer](#limePoint-solifi-consumer)
   * [Change Log](#change-log)
+    * [Release 2.2.4](#release-224)
     * [Release 2.2.1](#release-221)
     * [Release 2.2.0](#release-220)
     * [Release 2.1.1](#release-211)
@@ -69,6 +70,31 @@
 <!-- TOC -->
 
 ## Change Log
+
+### Release 2.2.4
+
+Bug Fixes
+- Fixed a bug introduced in 2.2.0 which ignored the `topic-table-mapping` configuration that resulted in tables being created incorrectly.
+- Added exception reporting if the license file is corrupted.
+
+Enhancements
+- Added more logging to indicate the flow between the consumer and upstream brokers, e.g. the consumers will log messages starting with `Sending acknowledgement` once it has processed the entry.
+- Updated the default `max-poll-records` to 5000; and `pollTimeOut` to 5 seconds.
+- Updated the `initial-load-mode` to be a two stage process in order to improve memory footprint. The consumer no longer requires execessive memory to run in the `initial-load-mode`, see [Initial Load Mode](#initial-load-mode) for more explanation.
+- Added a new property `save-full-audit` which defaults to `false`. This property is applicable only during the `initial-load-mode` and forces the consumer to save all the audit events in the topics. This property is different to normal auditing and will save more audit records than normal auditing, see [Initial Load Mode](#initial-load-mode) for more explanation.
+
+
+**The below steps are applicable Only When Using Auditing Features and Performing an Upgrade (Not Required for New Installations)**
+
+If any of your existing audit tables have a primary key that does not include all of the following columns, you will need to perform a full data resynchronisation. This requires dropping the audit tables so they can be automatically recreated by the consumer:
+
+- lp_kafka_partition
+- lp_kafka_offset
+- lp_db_insert_user
+- lp_db_insert_date
+
+If you are unable to perform a full resync, please contact LimePoint Support who can provide guidance on how to correct the primary keys in your audit tables without dropping them.
+
 
 ### Release 2.2.1
 
@@ -194,7 +220,7 @@ To get access to any issues related to the workings of the consumer, customers s
 ## Java Version Support
 The consumer is supported with the following Java versions:
 
-1. OpenJDK 17
+1. OpenJDK 21
 
 ---
 
@@ -916,7 +942,7 @@ When running in `streaming` mode, the consumer follows an `update-if-present` pr
 For example:
 - You have 140 topics with a combined 100 million messages.
 - Running a single consumer instance in streaming mode might take 10–12 days to process all messages.
-- Running multiple instances (e.g., 10 consumers) can create database locking contention, further reducing efficiency.
+- Running multiple instances (e.g., 10 consumers) can reduce overall time but create database locking contention, further reducing efficiency.
 
 In contrast, the `initial_load` mode operates on an `insert-only` principle, processing one topic partition at a time. It bypasses update locks, allowing for significantly faster ingestion. Once all messages are processed, the consumer stops automatically and must be restarted in streaming mode to resume normal operation.
 
@@ -929,6 +955,53 @@ Running the consumer in `initial_load` mode involves four steps:
 3. Monitor Load Progress
 4. Switch Back to Streaming Mode
 
+**A Note Regarding the save-full-audit property**
+
+When `save-full-audit` is set to true (see examples below), the consumer will store all records for a given key in the audit table. This differs from the behaviour controlled by `auditing -> enabled: true`.
+
+By default, when the consumer runs in `initial-load` mode, it only saves the **latest** record for each key in the audit table. However, if `save-full-audit` is enabled (set to true), the consumer will persist **every** record associated with that key.
+
+For example, consider a sample topic named `names` that has `id` as the `key` field:
+
+| id  | name  |
+| --- | ---   |
+| 1   | Sam   |
+| 2   | Fred  |
+| 3   | Brett | 
+| 2   | Rom   |
+| 2   | Rex   |
+
+When running the consumer in `initial-load` mode, the consumer will save the following entries the in the `names` table and `names_audit` table.
+
+**table: `names`**
+| id | name  |
+| --- | ---  |
+| 1  | Sam   |
+| 2  | Rex   |
+| 3  | Brett |
+
+**table: `names_audit`**
+| id  | name  | lp_db_action |
+| --- | ---   | ---     |
+| 1  | Sam    | INITIAL |
+| 2  | Rex    | INITIAL |
+| 3  | Brett  | INITIAL |
+
+Notice how the audit table only stores the last value of each `key`.
+
+If however, you set the value of the property `save-full-audit` to true, the audit table would look like this:
+
+**table: `names_audit`**
+| id  | name  | lp_db_action |
+| --- | ---   | ---   |
+| 1   | Sam   | INITIAL |
+| 2   | Fred  | INITIAL |
+| 3   | Brett | INITIAL |
+| 2   | Rom   | INITIAL |
+| 2   | Rex   | INITIAL |
+
+Note that enabling this property will increase the overall execution time.
+
 ### Step 1: Perform a Dry Run
 
 Before performing the actual data load, you must start with a clean backend database.
@@ -940,7 +1013,8 @@ solifi:
   initial-load:  
     enabled: true     # Enables initial_load mode (default: false)
     dryrun: true      # Performs discovery only (default: false)
-    batch-size: 20000 # Number of messages to fetch per batch
+    batch-size: 10000 # Optional. Number of messages to write to the database per batch (default: 100000)
+    save-full-audit: false # Optional. Saves all audit records (default: false)
     clientId: load-app-1 # Unique identifier for this consumer instance
   # <other properties>
 ```
@@ -987,9 +1061,11 @@ solifi:
   # <other properties>
 ```
 
-Each `clientId` instance processes one partition per topic at a time. For example, if there are 100 topics with 6 partitions each, a single consumer instance processes all partitions of a topic sequentially. No two instances will process the same topic.
+Each `clientId` instance processes one topic at a time and handles all of its partitions sequentially. For example, if you have 100 topics with 6 partitions each, a single consumer instance will fully process one topic (all 6 partitions) before moving on to the next. No two instances will ever process the same topic concurrently.
 
-To accelerate the process, you can run multiple consumers in parallel using different `clientId` values but with the same Kafka consumer group ID. 
+To speed up processing, you can run multiple consumer instances in parallel by assigning different `clientId` values while using the same Kafka consumer group ID.
+
+When multiple instances are started with unique `clientId` values, each instance acquires a lock on one topic to process. After locking a topic, the instance processes all of its partitions one by one. Once finished, it looks for another topic with `status = INITIAL` in the lp_initial_load table. If one is found, the instance repeats the process; if none remain, the instance shuts down.
 
 **Each consumer instance must use the same group-id value to coordinate partition assignment.**
 
@@ -1109,7 +1185,7 @@ The performance of the `initial_load` process depends on several factors:
 - Number of parallel consumer instances
 - Database capacity (CPU, memory, and storage performance)
 
-The consumer is memory-intensive during this phase. Required memory depends on message size and partition volume.
+The consumer is memory-intensive during this phase. The required memory depends on both the size of the messages and the volume of each partition. The figures provided below are intended only as rough guidance and may not reflect your specific needs. You may need to adjust additional settings such as `max-poll-records` to achieve optimal performance.
 
 Our internal testing uses this sample workload:
 
@@ -1118,14 +1194,22 @@ Our internal testing uses this sample workload:
 | Total topics                 | 144                |
 | Average partitions per topic | 6                  |
 | Largest partition            | 1 million messages |
-| Total messages               | 52 million         |
+| Total messages               | 46 million         |
+| Total messages including Audit   | 92 million         |
+| Total messages including Full Audit    | 95 million         |
+
+Observed duration
+| Workload                    | Value               | Duration | 
+| ---------------------------- | ------------------ | -------- |
+| Total messages               | 46 million         | 2 hours  |
+| Total messages including Audit  | 92 million      | 3 hours 47 mins |
+| Total messages including Full Audit  | 95 million | 4 hours 17 mins |
 
 
-**Recommended configurations**:
-- **Consumer instances**: 6 (each with 8 GB memory and 4 CPU)
+**Configurations Used For Above Workload**:
+- **Consumer instances**: 8 (each with 4 GB memory and 4 CPU)
 - **Database instance**: 8 CPU, 16 GB memory
 - **Network**: Local, no firewalls or packet inspection
-- **Observed duration**: ~4 hours 30 minutes
 
 After switching to `streaming` mode, resource requirements drop substantially.
 Typical configuration: 2 CPU / 2 GB memory per consumer instance.
